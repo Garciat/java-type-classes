@@ -10,6 +10,7 @@ import com.garciat.typeclasses.classes.Applicative;
 import com.garciat.typeclasses.classes.Functor;
 import com.garciat.typeclasses.classes.Monad;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.function.Function;
 
 public sealed interface Either<L, R> extends TApp<TPar<Either.Tag, L>, R> {
@@ -23,6 +24,14 @@ public sealed interface Either<L, R> extends TApp<TPar<Either.Tag, L>, R> {
 
   static <L, R> Either<L, R> right(R value) {
     return new Right<>(value);
+  }
+
+  static <A> Either<Exception, A> call(Callable<A> callable) {
+    try {
+      return right(callable.call());
+    } catch (Exception e) {
+      return left(e);
+    }
   }
 
   default <X> Either<L, X> map(Function<? super R, ? extends X> f) {
