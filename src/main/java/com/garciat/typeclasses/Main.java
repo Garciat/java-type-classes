@@ -37,89 +37,79 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class Main {
-  public static void main(String[] args) {
-    System.out.println(Show.show(witness(new Ty<>() {}), new int[] {1, 2, 3, 4, 5}));
-
-    System.out.println(Show.show(witness(new Ty<>() {}), new Integer[] {1, 2, 3, 4, 5}));
-
-    Map<String, List<Optional<Integer>>> m1 =
-        Map.of(
-            "a",
-            List.of(Optional.of(1), Optional.empty()),
-            "b",
-            List.of(Optional.of(2), Optional.of(3)));
-
-    System.out.printf("show(m1) = %s\n", Show.show(witness(new Ty<>() {}), m1));
-
-    List<Sum<Integer>> sums = List.of(new Sum<>(3), new Sum<>(5), new Sum<>(10));
-
-    System.out.printf(
-        "combineAll(%s) = %s\n", sums, Monoid.combineAll(witness(new Ty<>() {}), sums));
-
-    System.out.printf("eq(m1, m1) = %s\n", Eq.eq(witness(new Ty<>() {}), m1, m1));
-
-    Optional<Integer> m5 = Optional.of(5);
-    Optional<Integer> m10 = Optional.of(10);
-
-    System.out.printf(
-        "compare(%s, %s) = %s\n", m5, m10, Ord.compare(witness(new Ty<>() {}), m5, m10));
-
-    Arbitrary<Function<Optional<Integer>, List<Optional<Integer>>>> arbFunc =
-        witness(new Ty<>() {});
-    var f = arbFunc.arbitrary().generate(42L, 10);
-
-    System.out.println("f(10) = " + f.apply(Optional.of(5)));
-
-    System.out.println(
-        Traversable.traverse(
-            witness(new Ty<>() {}), witness(new Ty<>() {}), JavaList.of(1, 2, 3), Maybe::just));
-
-    System.out.println(Show.show(witness(new Ty<>() {}), FwdList.of('h', 'e', 'l', 'l', 'o')));
-
-    example(witness(new Ty<>() {}), 123);
-
-    F3<Integer, Integer, Integer, Integer> sum = SumAllInt.of(witness(new Ty<>() {}));
-    System.out.println(sum.apply(1, 2, 3));
-
-    F3<String, JavaList<String>, Integer, Void> printer = PrintAll.of(witness(new Ty<>() {}));
-    printer.apply("Items:", JavaList.of("apple", "banana", "cherry"), 0);
-
-    Foldable<FwdList.Tag> foldableFwdList = witness(new Ty<>() {});
-
-    System.out.println(foldableFwdList.length(FwdList.of(1, 2, 3, 4, 5)));
-
-    System.out.println(foldableFwdList.toList(FwdList.of(1, 2, 3)));
-  }
-
-  static <A> void example(Show<A> showA, A value) {
-    System.out.println(Show.show(witness(new Ty<>() {}, new Ctx<>(showA) {}), JavaList.of(value)));
-  }
+/**
+ * Core type class infrastructure for Java.
+ *
+ * <p>This class has been retained for backward compatibility but is no longer the main entry point.
+ * The library should be accessed through the public type classes and data types.
+ *
+ * @deprecated Use {@link Examples} for demonstration code, or the individual type classes directly.
+ */
+@Deprecated
+public final class Main {
+  private Main() {}
 }
 
 // ==== Type System ====
 
-// This is how we get basic kind checking in Java
+/**
+ * Base interface for kind-level types, providing basic kind checking in Java.
+ *
+ * <p>This interface is used to represent type-level kinds, similar to kinds in Haskell's type
+ * system.
+ *
+ * <p><b>PUBLIC API</b>: This is part of the library's public API. Users implementing custom data
+ * types will need to use this interface.
+ */
 interface Kind<K extends Kind.Base> {
+  /** Base interface for all kinds. */
   sealed interface Base {}
 
-  // KStar = *
+  /** KStar represents the kind * (star) - the kind of proper types. */
   final class KStar implements Base {}
 
-  // KArr k = * -> k
+  /** KArr k represents the kind * -> k - the kind of type constructors. */
   final class KArr<K extends Base> implements Base {}
 }
 
+/**
+ * Base class for type-level tags. Subclasses of this class represent type constructor tags used in
+ * higher-kinded type encoding.
+ *
+ * <p><b>PUBLIC API</b>: This is part of the library's public API. Users implementing custom data
+ * types will need to extend this class.
+ *
+ * @param <K> the kind of this tag
+ */
 abstract class TagBase<K extends Kind.Base> implements Kind<K> {}
 
-// Full application of a unary type constructor
-// TApp :: (* -> *) -> * -> *
+/**
+ * Full application of a unary type constructor.
+ *
+ * <p>TApp :: (* -> *) -> * -> *
+ *
+ * <p><b>PUBLIC API</b>: This is part of the library's public API. Users will use this in type
+ * signatures.
+ *
+ * @param <Tag> the type constructor tag
+ * @param <A> the applied type argument
+ */
 interface TApp<Tag extends Kind<KArr<KStar>>, A> extends Kind<KStar> {}
 
-// Partial application of a binary type constructor
-// TPar :: (* -> * -> *) -> * -> (* -> *)
+/**
+ * Partial application of a binary type constructor.
+ *
+ * <p>TPar :: (* -> * -> *) -> * -> (* -> *)
+ *
+ * <p><b>PUBLIC API</b>: This is part of the library's public API. Users will use this in type
+ * signatures.
+ *
+ * @param <Tag> the type constructor tag
+ * @param <A> the first applied type argument
+ */
 interface TPar<Tag extends Kind<KArr<KArr<KStar>>>, A> extends Kind<KArr<KStar>> {}
 
+// Internal type parsing
 sealed interface ParsedType {
   record Var(TypeVariable<?> java) implements ParsedType {}
 
@@ -188,6 +178,7 @@ sealed interface ParsedType {
   }
 }
 
+// Internal unification algorithm
 class Unification {
   public static Maybe<Map<ParsedType.Var, ParsedType>> unify(ParsedType t1, ParsedType t2) {
     return switch (Pair.of(t1, t2)) {
@@ -231,6 +222,7 @@ class Unification {
   }
 }
 
+// Internal function type representation
 record FuncType(Method java, List<ParsedType> paramTypes, ParsedType returnType) {
   public String format() {
     return String.format(
@@ -257,45 +249,138 @@ record FuncType(Method java, List<ParsedType> paramTypes, ParsedType returnType)
 
 // === Type Class System ===
 
+/**
+ * Marks an interface as a type class.
+ *
+ * <p>Type classes are interfaces that define a set of operations that can be implemented for
+ * various types. The type class system uses compile-time and runtime reflection to automatically
+ * resolve instances.
+ *
+ * <p><b>PUBLIC API</b>: This is part of the library's public API. Users define and implement type
+ * classes using this annotation.
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @interface TypeClass {
+  /** Marks a method as a witness (instance) of a type class. */
   @Retention(RetentionPolicy.RUNTIME)
   @interface Witness {
+    /**
+     * Specifies the overlap behavior for this witness.
+     *
+     * @return the overlap behavior
+     */
     Overlap overlap() default Overlap.NONE;
 
+    /** Defines how instances can overlap with other instances. */
     enum Overlap {
+      /** No overlap allowed (default). */
       NONE,
+      /** This instance can overlap and take precedence over others. */
       OVERLAPPING,
+      /** This instance can be overlapped by others. */
       OVERLAPPABLE
     }
   }
 }
 
+/**
+ * Type token for capturing type information at runtime.
+ *
+ * <p>Usage:
+ *
+ * <pre>{@code
+ * Show<String> showString = TypeClasses.witness(new Ty<Show<String>>() {});
+ * }</pre>
+ *
+ * <p><b>PUBLIC API</b>: This is the main interface users interact with to summon type class
+ * instances.
+ *
+ * @param <T> the type being captured
+ */
 interface Ty<T> {
+  /**
+   * Returns the captured type.
+   *
+   * @return the Type object representing T
+   */
   default Type type() {
     return requireNonNull(
         ((ParameterizedType) getClass().getGenericInterfaces()[0]).getActualTypeArguments()[0]);
   }
 }
 
+/**
+ * Context token for capturing type class instances at runtime.
+ *
+ * <p>Usage:
+ *
+ * <pre>{@code
+ * Show<String> showString = ...;
+ * Ctx<Show<String>> ctx = new Ctx<>(showString) {};
+ * }</pre>
+ *
+ * <p><b>PUBLIC API</b>: Used for passing explicit type class instances to witness resolution.
+ *
+ * @param <T> the type class instance type
+ */
 abstract class Ctx<T> {
   private final T instance;
 
-  Ctx(T instance) {
+  /**
+   * Constructs a context with the given instance.
+   *
+   * @param instance the type class instance
+   */
+  protected Ctx(T instance) {
     this.instance = instance;
   }
 
+  /**
+   * Returns the instance.
+   *
+   * @return the type class instance
+   */
   public T instance() {
     return instance;
   }
 
+  /**
+   * Returns the captured type.
+   *
+   * @return the Type object representing T
+   */
   public Type type() {
     return requireNonNull(
         ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[0]);
   }
 }
 
+// Internal witness resolution utilities
+/**
+ * Central facility for type class witness resolution.
+ *
+ * <p><b>PUBLIC API</b>: The {@link #witness} method is the main entry point for the library.
+ */
 class TypeClasses {
+  /**
+   * Resolves and returns a witness (instance) of a type class for the given type.
+   *
+   * <p>This is the main entry point for using the type class system. It automatically finds and
+   * instantiates the appropriate type class instance based on the provided type token.
+   *
+   * <p>Example:
+   *
+   * <pre>{@code
+   * Show<List<Integer>> showListInt = TypeClasses.witness(new Ty<Show<List<Integer>>>() {});
+   * String result = showListInt.show(List.of(1, 2, 3));
+   * }</pre>
+   *
+   * @param <T> the type class instance type
+   * @param ty the type token capturing the desired type class instance
+   * @param context optional context instances to use in resolution
+   * @return the resolved type class instance
+   * @throws WitnessResolutionException if no suitable instance can be found
+   */
   public static <T> T witness(Ty<T> ty, Ctx<?>... context) {
     return switch (summon(ParsedType.parse(ty.type()), parseContext(context))) {
       case Either.Left<SummonError, Object>(SummonError error) ->
@@ -314,7 +399,8 @@ class TypeClasses {
         .toList();
   }
 
-  public static class WitnessResolutionException extends RuntimeException {
+  /** Exception thrown when a type class witness cannot be resolved. PUBLIC API. */
+  static class WitnessResolutionException extends RuntimeException {
     private WitnessResolutionException(SummonError error) {
       super(error.format());
     }
@@ -1726,8 +1812,15 @@ interface Parser<A> extends TApp<Parser.Tag, A> {
   }
 }
 
-// === Weird Type Class Examples ===
+// === Example Type Class Implementations ===
+// These are example implementations demonstrating advanced type class features.
+// They are package-private as they're primarily for demonstration purposes.
 
+/**
+ * Example type class demonstrating variadic functions through type class resolution.
+ *
+ * @param <A> the result type
+ */
 @TypeClass
 interface SumAllInt<A> {
   A sum(List<Integer> list);
@@ -1764,7 +1857,10 @@ interface SumAllInt<A> {
 }
 
 /**
- * @implNote <a href="https://wiki.haskell.org/Varargs">Source</a>
+ * Example type class for variadic printing.
+ *
+ * @param <T> the result type
+ * @see <a href="https://wiki.haskell.org/Varargs">Source</a>
  */
 @TypeClass
 interface PrintAll<T> {
@@ -1806,6 +1902,7 @@ interface PrintAll<T> {
   }
 }
 
+/** Helper interface for one-argument functions used in examples. */
 @FunctionalInterface
 interface F1<A, R> {
   R apply(A a);
@@ -1815,6 +1912,7 @@ interface F1<A, R> {
   }
 }
 
+/** Helper interface for two-argument functions used in examples. */
 @FunctionalInterface
 interface F2<A, B, R> {
   R apply(A a, B b);
@@ -1824,6 +1922,7 @@ interface F2<A, B, R> {
   }
 }
 
+/** Helper interface for three-argument functions used in examples. */
 @FunctionalInterface
 interface F3<A, B, C, R> {
   R apply(A a, B b, C c);
@@ -1835,6 +1934,7 @@ interface F3<A, B, C, R> {
 
 // === Utilities ===
 
+// Internal result type for instance selection
 sealed interface ZeroOneMore<A> {
   record Zero<A>() implements ZeroOneMore<A> {}
 
@@ -1851,6 +1951,7 @@ sealed interface ZeroOneMore<A> {
   }
 }
 
+// Internal list utilities
 class Lists {
   public static <A, B> List<B> map(List<A> list, Function<? super A, ? extends B> f) {
     return list.stream().map(f).collect(Collectors.toList());
@@ -1862,6 +1963,7 @@ class Lists {
   }
 }
 
+// Internal map utilities
 class Maps {
   public static <K, V> Map<K, V> merge(Map<K, V> m1, Map<K, V> m2) {
     Map<K, V> result = new HashMap<>(m1);
@@ -1875,6 +1977,7 @@ class Maps {
   }
 }
 
+// Internal function utilities
 class Functions {
   public static <A, B, C> BiFunction<B, A, C> flip(BiFunction<A, B, C> f) {
     return (b, a) -> f.apply(a, b);
