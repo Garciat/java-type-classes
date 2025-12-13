@@ -46,12 +46,12 @@ public class TypeClasses {
     }
   }
 
-  private sealed interface SummonError {
-    record NotFound(ParsedType target) implements SummonError {}
+  private sealed interface ResolutionError {
+    record NotFound(ParsedType target) implements ResolutionError {}
 
-    record Ambiguous(ParsedType target, List<Candidate> candidates) implements SummonError {}
+    record Ambiguous(ParsedType target, List<Candidate> candidates) implements ResolutionError {}
 
-    record Nested(ParsedType target, SummonError cause) implements SummonError {}
+    record Nested(ParsedType target, ResolutionError cause) implements ResolutionError {}
 
     default String format() {
       return switch (this) {
@@ -64,11 +64,38 @@ public class TypeClasses {
                     .map(c -> c.rule().toString())
                     .collect(Collectors.joining("\n"))
                     .indent(2);
-        case Nested(ParsedType target, SummonError cause) ->
-            "While summoning witness for type: "
+        case Nested(ParsedType target, ResolutionError cause) ->
+            "While resolving witness for type: "
                 + target.format()
                 + "\nCaused by: "
                 + cause.format().indent(2);
+      };
+    }
+  }
+
+  private sealed interface InstantiationError {
+    record LookupMiss(ParsedType type) implements InstantiationError {}
+
+    record InvocationException(Method method, Exception cause) implements InstantiationError {}
+
+    default String format() {
+      return switch (this) {
+        case LookupMiss(ParsedType type) -> "Context lookup failed for type: " + type.format();
+        case InvocationException(Method method, Exception cause) ->
+            "Failed to invoke constructor: " + method + "\nCause: " + cause.getMessage();
+      };
+    }
+  }
+
+  private sealed interface SummonError {
+    record Resolution(ResolutionError error) implements SummonError {}
+
+    record Instantiation(InstantiationError error) implements SummonError {}
+
+    default String format() {
+      return switch (this) {
+        case Resolution(ResolutionError error) -> error.format();
+        case Instantiation(InstantiationError error) -> error.format();
       };
     }
   }
@@ -79,9 +106,15 @@ public class TypeClasses {
    */
   private static Either<SummonError, Object> summon(
       ParsedType target, List<ContextInstance> context) {
-    return resolveWitness(target, context)
-        .map(TypeClasses::compile)
-        .map(expr -> interpret(new InterpretContext(context), expr));
+    Either<SummonError, InstantiationPlan> resolutionResult =
+        resolveWitness(target, context).mapLeft(SummonError.Resolution::new);
+
+    Either<SummonError, Expr<ParsedType>> compilationResult =
+        resolutionResult.map(TypeClasses::compile);
+
+    return compilationResult.flatMap(
+        expr ->
+            interpret(new InterpretContext(context), expr).mapLeft(SummonError.Instantiation::new));
   }
 
   private record Candidate(WitnessRule rule, List<ParsedType> requirements) {}
@@ -108,22 +141,22 @@ public class TypeClasses {
   }
 
   /** Resolves a ParsedType into an InstantiationPlan. */
-  private static Either<SummonError, InstantiationPlan> resolveWitness(
+  private static Either<ResolutionError, InstantiationPlan> resolveWitness(
       ParsedType target, List<ContextInstance> context) {
     return switch (ZeroOneMore.of(findCandidates(target, context))) {
       case ZeroOneMore.One<Candidate>(Candidate(var rule, var requirements)) ->
           resolveWitnessAll(requirements, context)
               .<InstantiationPlan>map(
                   dependencies -> new InstantiationPlan.PlanStep(rule, dependencies))
-              .mapLeft(error -> new SummonError.Nested(target, error));
-      case ZeroOneMore.Zero<Candidate>() -> Either.left(new SummonError.NotFound(target));
+              .mapLeft(error -> new ResolutionError.Nested(target, error));
+      case ZeroOneMore.Zero<Candidate>() -> Either.left(new ResolutionError.NotFound(target));
       case ZeroOneMore.More<Candidate>(var candidates) ->
-          Either.left(new SummonError.Ambiguous(target, candidates));
+          Either.left(new ResolutionError.Ambiguous(target, candidates));
     };
   }
 
   /** Resolves multiple ParsedTypes into a list of InstantiationPlans. */
-  private static Either<SummonError, List<InstantiationPlan>> resolveWitnessAll(
+  private static Either<ResolutionError, List<InstantiationPlan>> resolveWitnessAll(
       List<ParsedType> targets, List<ContextInstance> context) {
     return Either.traverse(targets, target -> resolveWitness(target, context));
   }
@@ -146,26 +179,49 @@ public class TypeClasses {
    * ParsedTypes.
    */
   private record InterpretContext(List<ContextInstance> instances) {
-    Object lookup(ParsedType type) {
+    Either<InstantiationError, Object> lookup(ParsedType type) {
       return instances.stream()
           .filter(ci -> ci.type().equals(type))
           .findFirst()
           .map(ContextInstance::instance)
-          .orElseThrow(
-              () -> new RuntimeException("Context lookup failed for type: " + type.format()));
+          .<Either<InstantiationError, Object>>map(Either::right)
+          .orElseGet(() -> Either.left(new InstantiationError.LookupMiss(type)));
     }
   }
 
   /** Interprets an Expr with a given context. */
-  private static Object interpret(InterpretContext context, Expr<ParsedType> expr) {
+  private static Either<InstantiationError, Object> interpret(
+      InterpretContext context, Expr<ParsedType> expr) {
     return switch (expr) {
       case Expr.Lookup<ParsedType>(var type) -> context.lookup(type);
       case Expr.InvokeConstructor<ParsedType>(var method, var args) -> {
-        Object[] evaluatedArgs = args.stream().map(arg -> interpret(context, arg)).toArray();
+        // Evaluate all arguments first
+        List<Either<InstantiationError, Object>> evaluatedArgs =
+            args.stream().map(arg -> interpret(context, arg)).toList();
+
+        // Check if any argument evaluation failed
+        for (Either<InstantiationError, Object> argResult : evaluatedArgs) {
+          if (argResult instanceof Either.Left<InstantiationError, Object>(var error)) {
+            yield Either.left(error);
+          }
+        }
+
+        // Extract successful values
+        Object[] argValues =
+            evaluatedArgs.stream()
+                .map(
+                    e ->
+                        switch (e) {
+                          case Either.Right<InstantiationError, Object>(var value) -> value;
+                          case Either.Left<InstantiationError, Object>(var error) ->
+                              throw new IllegalStateException("Unreachable");
+                        })
+                .toArray();
+
         try {
-          yield method.invoke(null, evaluatedArgs);
+          yield Either.right(method.invoke(null, argValues));
         } catch (Exception e) {
-          throw new RuntimeException("Failed to invoke constructor: " + method, e);
+          yield Either.left(new InstantiationError.InvocationException(method, e));
         }
       }
     };
