@@ -37,9 +37,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public final class Main {
-  private Main() {}
-}
 
 // Internal type parsing
 sealed interface ParsedType {
