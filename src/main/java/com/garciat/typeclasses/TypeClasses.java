@@ -269,19 +269,12 @@ public class TypeClasses {
 
   private sealed interface WitnessRule {
     Maybe<List<ParsedType>> tryMatch(ParsedType target);
-
-    Object instantiate(List<Object> dependencies);
   }
 
   private record ContextInstance(Object instance, ParsedType type) implements WitnessRule {
     @Override
     public Maybe<List<ParsedType>> tryMatch(ParsedType target) {
       return target.equals(type) ? Maybe.just(List.of()) : Maybe.nothing();
-    }
-
-    @Override
-    public Object instantiate(List<Object> dependencies) {
-      return instance;
     }
 
     @Override
@@ -299,15 +292,6 @@ public class TypeClasses {
     public Maybe<List<ParsedType>> tryMatch(ParsedType target) {
       return Unification.unify(func.returnType(), target)
           .map(map -> Unification.substituteAll(map, func.paramTypes()));
-    }
-
-    @Override
-    public Object instantiate(List<Object> dependencies) {
-      try {
-        return func.java().invoke(null, dependencies.toArray());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
     }
 
     @Override
