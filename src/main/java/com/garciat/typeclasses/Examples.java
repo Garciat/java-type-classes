@@ -1,8 +1,5 @@
 package com.garciat.typeclasses;
 
-import static com.garciat.typeclasses.Functions.curry;
-import static com.garciat.typeclasses.Functions.flip;
-import static com.garciat.typeclasses.TyEq.refl;
 import static com.garciat.typeclasses.TypeClasses.witness;
 
 import java.util.List;

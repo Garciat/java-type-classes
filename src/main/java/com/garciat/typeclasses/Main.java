@@ -5,7 +5,6 @@ import static com.garciat.typeclasses.Functions.flip;
 import static com.garciat.typeclasses.TyEq.refl;
 import static com.garciat.typeclasses.TypeClass.Witness.Overlap.OVERLAPPABLE;
 import static com.garciat.typeclasses.TypeClass.Witness.Overlap.OVERLAPPING;
-import static com.garciat.typeclasses.TypeClasses.witness;
 import static java.lang.reflect.AccessFlag.PUBLIC;
 import static java.lang.reflect.AccessFlag.STATIC;
 import static java.util.Objects.requireNonNull;
