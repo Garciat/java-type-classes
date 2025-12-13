@@ -8,12 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import org.junit.jupiter.api.Test;
 
-/** Demonstration of the java-type-classes library features. */
-public final class Examples {
-  private Examples() {}
+/** Tests demonstrating the java-type-classes library features. */
+final class ExamplesTest {
 
-  public static void main(String[] args) {
+  @Test
+  void examples() {
     System.out.println(Show.show(witness(new Ty<>() {}), new int[] {1, 2, 3, 4, 5}));
 
     System.out.println(Show.show(witness(new Ty<>() {}), new Integer[] {1, 2, 3, 4, 5}));

@@ -16,31 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * Central facility for type class witness resolution.
- *
- * <p><b>PUBLIC API</b>: The {@link #witness} method is the main entry point for the library.
- */
 public class TypeClasses {
-  /**
-   * Resolves and returns a witness (instance) of a type class for the given type.
-   *
-   * <p>This is the main entry point for using the type class system. It automatically finds and
-   * instantiates the appropriate type class instance based on the provided type token.
-   *
-   * <p>Example:
-   *
-   * <pre>{@code
-   * Show<List<Integer>> showListInt = TypeClasses.witness(new Ty<>() {});
-   * String result = showListInt.show(List.of(1, 2, 3));
-   * }</pre>
-   *
-   * @param <T> the type class instance type
-   * @param ty the type token capturing the desired type class instance
-   * @param context optional context instances to use in resolution
-   * @return the resolved type class instance
-   * @throws WitnessResolutionException if no suitable instance can be found
-   */
   public static <T> T witness(Ty<T> ty, Ctx<?>... context) {
     return switch (summon(ParsedType.parse(ty.type()), parseContext(context))) {
       case Either.Left<SummonError, Object>(SummonError error) ->
@@ -59,7 +35,6 @@ public class TypeClasses {
         .toList();
   }
 
-  /** Exception thrown when a type class witness cannot be resolved. PUBLIC API. */
   public static class WitnessResolutionException extends RuntimeException {
     private WitnessResolutionException(SummonError error) {
       super(error.format());

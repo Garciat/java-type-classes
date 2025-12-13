@@ -36,15 +36,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * Core type class infrastructure for Java.
- *
- * <p>This class has been retained for backward compatibility but is no longer the main entry point.
- * The library should be accessed through the public type classes and data types.
- *
- * @deprecated Use {@link Examples} for demonstration code, or the individual type classes directly.
- */
-@Deprecated
 public final class Main {
   private Main() {}
 }
