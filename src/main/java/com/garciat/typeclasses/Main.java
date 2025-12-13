@@ -13,6 +13,7 @@ import com.garciat.typeclasses.api.hkt.Kind.KStar;
 import com.garciat.typeclasses.api.hkt.TApp;
 import com.garciat.typeclasses.api.hkt.TPar;
 import com.garciat.typeclasses.api.hkt.TagBase;
+import com.garciat.typeclasses.classes.Ordering;
 import com.garciat.typeclasses.impl.Lists;
 import com.garciat.typeclasses.impl.Maps;
 import java.lang.reflect.GenericArrayType;
@@ -329,12 +330,6 @@ interface Eq<A> {
       return true;
     };
   }
-}
-
-enum Ordering {
-  LT,
-  EQ,
-  GT
 }
 
 @TypeClass
