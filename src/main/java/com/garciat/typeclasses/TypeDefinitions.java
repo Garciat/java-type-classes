@@ -1,3 +1,5 @@
+// This file contains all type class and data type definitions
+// TODO: Extract to individual files in classes/ and types/ packages
 package com.garciat.typeclasses;
 
 import static com.garciat.typeclasses.TyEq.refl;
