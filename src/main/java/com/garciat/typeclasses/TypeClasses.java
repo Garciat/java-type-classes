@@ -73,12 +73,48 @@ public class TypeClasses {
     }
   }
 
+  /**
+   * Summons a witness for the given target type using the staged resolution approach: parseType >>
+   * resolveWitness >> compile >> interpret
+   */
   private static Either<SummonError, Object> summon(
+      ParsedType target, List<ContextInstance> context) {
+    return resolveWitness(target, context)
+        .map(TypeClasses::compile)
+        .map(expr -> interpret(new InterpretContext(context), expr));
+  }
+
+  private record Candidate(WitnessRule rule, List<ParsedType> requirements) {}
+
+  // ========== Staged Resolution Components ==========
+
+  /**
+   * Represents the fully resolved instantiation plan. This is a tree structure where each node is a
+   * step in the instantiation process, with dependencies on other steps.
+   */
+  private sealed interface InstantiationPlan {
+    record PlanStep(WitnessRule target, List<InstantiationPlan> dependencies)
+        implements InstantiationPlan {}
+  }
+
+  /**
+   * Represents a reduced AST of interpretable Java operations. This is the compiled form of an
+   * InstantiationPlan.
+   */
+  private sealed interface Expr<K> {
+    record InvokeConstructor<K>(Method method, List<Expr<K>> arguments) implements Expr<K> {}
+
+    record Lookup<K>(K key) implements Expr<K> {}
+  }
+
+  /** Resolves a ParsedType into an InstantiationPlan. */
+  private static Either<SummonError, InstantiationPlan> resolveWitness(
       ParsedType target, List<ContextInstance> context) {
     return switch (ZeroOneMore.of(findCandidates(target, context))) {
       case ZeroOneMore.One<Candidate>(Candidate(var rule, var requirements)) ->
-          summonAll(requirements, context)
-              .map(rule::instantiate)
+          resolveWitnessAll(requirements, context)
+              .<InstantiationPlan>map(
+                  dependencies -> new InstantiationPlan.PlanStep(rule, dependencies))
               .mapLeft(error -> new SummonError.Nested(target, error));
       case ZeroOneMore.Zero<Candidate>() -> Either.left(new SummonError.NotFound(target));
       case ZeroOneMore.More<Candidate>(var candidates) ->
@@ -86,12 +122,54 @@ public class TypeClasses {
     };
   }
 
-  private static Either<SummonError, List<Object>> summonAll(
+  /** Resolves multiple ParsedTypes into a list of InstantiationPlans. */
+  private static Either<SummonError, List<InstantiationPlan>> resolveWitnessAll(
       List<ParsedType> targets, List<ContextInstance> context) {
-    return Either.traverse(targets, target -> summon(target, context));
+    return Either.traverse(targets, target -> resolveWitness(target, context));
   }
 
-  private record Candidate(WitnessRule rule, List<ParsedType> requirements) {}
+  /** Compiles an InstantiationPlan into an Expr. */
+  private static Expr<ParsedType> compile(InstantiationPlan plan) {
+    return switch (plan) {
+      case InstantiationPlan.PlanStep(var rule, var dependencies) ->
+          switch (rule) {
+            case ContextInstance(var instance, var type) -> new Expr.Lookup<>(type);
+            case InstanceConstructor(var func) ->
+                new Expr.InvokeConstructor<>(
+                    func.java(), dependencies.stream().map(TypeClasses::compile).toList());
+          };
+    };
+  }
+
+  /**
+   * Context for interpretation - maps keys to resolved instances. For our use case, keys are
+   * ParsedTypes.
+   */
+  private record InterpretContext(List<ContextInstance> instances) {
+    Object lookup(ParsedType type) {
+      return instances.stream()
+          .filter(ci -> ci.type().equals(type))
+          .findFirst()
+          .map(ContextInstance::instance)
+          .orElseThrow(
+              () -> new RuntimeException("Context lookup failed for type: " + type.format()));
+    }
+  }
+
+  /** Interprets an Expr with a given context. */
+  private static Object interpret(InterpretContext context, Expr<ParsedType> expr) {
+    return switch (expr) {
+      case Expr.Lookup<ParsedType>(var type) -> context.lookup(type);
+      case Expr.InvokeConstructor<ParsedType>(var method, var args) -> {
+        Object[] evaluatedArgs = args.stream().map(arg -> interpret(context, arg)).toArray();
+        try {
+          yield method.invoke(null, evaluatedArgs);
+        } catch (Exception e) {
+          throw new RuntimeException("Failed to invoke constructor: " + method, e);
+        }
+      }
+    };
+  }
 
   private static List<Candidate> findCandidates(ParsedType target, List<ContextInstance> context) {
     return Stream.<WitnessRule>concat(
