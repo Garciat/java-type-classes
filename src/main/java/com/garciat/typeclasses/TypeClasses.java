@@ -208,13 +208,9 @@ public class TypeClasses {
       case Expr.InvokeConstructor<ParsedType>(var method, var args) ->
           Either.traverse(args, arg -> interpret(context, arg))
               .flatMap(
-                  argValues -> {
-                    try {
-                      return Either.right(method.invoke(null, argValues.toArray()));
-                    } catch (Exception e) {
-                      return Either.left(new InstantiationError.InvocationException(method, e));
-                    }
-                  });
+                  argValues ->
+                      Either.call(() -> method.invoke(null, argValues.toArray()))
+                          .mapLeft(e -> new InstantiationError.InvocationException(method, e)));
     };
   }
 
