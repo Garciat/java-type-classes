@@ -6,13 +6,13 @@ import static com.garciat.typeclasses.impl.Functions.curry;
 import static com.garciat.typeclasses.impl.Functions.flip;
 import static java.util.function.Function.identity;
 
-import com.garciat.typeclasses.api.Kind;
-import com.garciat.typeclasses.api.Kind.KArr;
-import com.garciat.typeclasses.api.Kind.KStar;
-import com.garciat.typeclasses.api.TApp;
-import com.garciat.typeclasses.api.TPar;
-import com.garciat.typeclasses.api.TagBase;
 import com.garciat.typeclasses.api.TypeClass;
+import com.garciat.typeclasses.api.hkt.Kind;
+import com.garciat.typeclasses.api.hkt.Kind.KArr;
+import com.garciat.typeclasses.api.hkt.Kind.KStar;
+import com.garciat.typeclasses.api.hkt.TApp;
+import com.garciat.typeclasses.api.hkt.TPar;
+import com.garciat.typeclasses.api.hkt.TagBase;
 import com.garciat.typeclasses.impl.Lists;
 import com.garciat.typeclasses.impl.Maps;
 import java.lang.reflect.GenericArrayType;
@@ -39,9 +39,6 @@ import java.util.stream.Stream;
 public final class Main {
   private Main() {}
 }
-
-// ==== Type System ====
-// Kind, TApp, TPar, TagBase are now in com.garciat.typeclasses.api package
 
 // Internal type parsing
 sealed interface ParsedType {

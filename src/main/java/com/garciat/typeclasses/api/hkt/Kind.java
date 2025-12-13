@@ -1,4 +1,4 @@
-package com.garciat.typeclasses.api;
+package com.garciat.typeclasses.api.hkt;
 
 public interface Kind<K extends Kind.Base> {
   sealed interface Base permits KStar, KArr {}
