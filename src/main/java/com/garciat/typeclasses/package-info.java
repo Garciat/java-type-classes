@@ -11,7 +11,7 @@
  * type class instances:
  *
  * <pre>{@code
- * Show<List<Integer>> showListInt = TypeClasses.witness(new Ty<Show<List<Integer>>>() {});
+ * Show<List<Integer>> showListInt = TypeClasses.witness(new Ty<>() {});
  * String result = showListInt.show(List.of(1, 2, 3));
  * }</pre>
  *

@@ -330,7 +330,7 @@ abstract class Ctx<T> {
    *
    * @param instance the type class instance
    */
-  protected Ctx(T instance) {
+  public Ctx(T instance) {
     this.instance = instance;
   }
 
@@ -399,7 +399,7 @@ class TypeClasses {
   }
 
   /** Exception thrown when a type class witness cannot be resolved. PUBLIC API. */
-  static class WitnessResolutionException extends RuntimeException {
+  public static class WitnessResolutionException extends RuntimeException {
     private WitnessResolutionException(SummonError error) {
       super(error.format());
     }
