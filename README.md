@@ -1,3 +1,3 @@
-Conventions:
+# Type Class resolution for Java
 
-- Use google-java-format
+See: https://garciat.com/posts/java-type-classes/
