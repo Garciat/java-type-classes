@@ -2,6 +2,8 @@ package com.garciat.typeclasses;
 
 import static com.garciat.typeclasses.TypeClasses.witness;
 
+import com.garciat.typeclasses.api.Ctx;
+import com.garciat.typeclasses.api.Ty;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

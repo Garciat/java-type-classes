@@ -3,6 +3,8 @@ package com.garciat.typeclasses;
 import static com.garciat.typeclasses.TypeClasses.witness;
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.garciat.typeclasses.api.TApp;
+import com.garciat.typeclasses.api.Ty;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
