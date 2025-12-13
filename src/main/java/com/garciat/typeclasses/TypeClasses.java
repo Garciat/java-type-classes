@@ -49,19 +49,19 @@ public class TypeClasses {
   private sealed interface ResolutionError {
     record NotFound(ParsedType target) implements ResolutionError {}
 
-    record Ambiguous(ParsedType target, List<Candidate> candidates) implements ResolutionError {}
+    record Ambiguous(ParsedType target, List<WitnessRule> candidates) implements ResolutionError {}
 
     record Nested(ParsedType target, ResolutionError cause) implements ResolutionError {}
 
     default String format() {
       return switch (this) {
         case NotFound(ParsedType target) -> "No witness found for type: " + target.format();
-        case Ambiguous(ParsedType target, List<Candidate> candidates) ->
+        case Ambiguous(ParsedType target, List<WitnessRule> candidates) ->
             "Ambiguous witnesses found for type: "
                 + target.format()
                 + "\nCandidates:\n"
                 + candidates.stream()
-                    .map(c -> c.rule().toString())
+                    .map(WitnessRule::toString)
                     .collect(Collectors.joining("\n"))
                     .indent(2);
         case Nested(ParsedType target, ResolutionError cause) ->
@@ -117,8 +117,6 @@ public class TypeClasses {
             interpret(new InterpretContext(context), expr).mapLeft(SummonError.Instantiation::new));
   }
 
-  private record Candidate(WitnessRule rule, List<ParsedType> requirements) {}
-
   // ========== Staged Resolution Components ==========
 
   /**
@@ -143,15 +141,28 @@ public class TypeClasses {
   /** Resolves a ParsedType into an InstantiationPlan. */
   private static Either<ResolutionError, InstantiationPlan> resolveWitness(
       ParsedType target, List<ContextInstance> context) {
-    return switch (ZeroOneMore.of(findCandidates(target, context))) {
-      case ZeroOneMore.One<Candidate>(Candidate(var rule, var requirements)) ->
+    record Match(WitnessRule rule, List<ParsedType> requirements) {}
+
+    List<Match> matches =
+        Stream.<WitnessRule>concat(context.stream(), reduceOverlapping(findRules(target)).stream())
+            .flatMap(
+                rule ->
+                    rule
+                        .tryMatch(target)
+                        .map(requirements -> new Match(rule, requirements))
+                        .stream())
+            .toList();
+
+    return switch (ZeroOneMore.of(matches)) {
+      case ZeroOneMore.One<Match>(Match(var rule, var requirements)) ->
           resolveWitnessAll(requirements, context)
               .<InstantiationPlan>map(
                   dependencies -> new InstantiationPlan.PlanStep(rule, dependencies))
               .mapLeft(error -> new ResolutionError.Nested(target, error));
-      case ZeroOneMore.Zero<Candidate>() -> Either.left(new ResolutionError.NotFound(target));
-      case ZeroOneMore.More<Candidate>(var candidates) ->
-          Either.left(new ResolutionError.Ambiguous(target, candidates));
+      case ZeroOneMore.Zero<Match>() -> Either.left(new ResolutionError.NotFound(target));
+      case ZeroOneMore.More<Match>(var matches2) ->
+          Either.left(
+              new ResolutionError.Ambiguous(target, matches2.stream().map(Match::rule).toList()));
     };
   }
 
@@ -194,49 +205,17 @@ public class TypeClasses {
       InterpretContext context, Expr<ParsedType> expr) {
     return switch (expr) {
       case Expr.Lookup<ParsedType>(var type) -> context.lookup(type);
-      case Expr.InvokeConstructor<ParsedType>(var method, var args) -> {
-        // Evaluate all arguments first
-        List<Either<InstantiationError, Object>> evaluatedArgs =
-            args.stream().map(arg -> interpret(context, arg)).toList();
-
-        // Check if any argument evaluation failed
-        for (Either<InstantiationError, Object> argResult : evaluatedArgs) {
-          if (argResult instanceof Either.Left<InstantiationError, Object>(var error)) {
-            yield Either.left(error);
-          }
-        }
-
-        // Extract successful values
-        Object[] argValues =
-            evaluatedArgs.stream()
-                .map(
-                    e ->
-                        switch (e) {
-                          case Either.Right<InstantiationError, Object>(var value) -> value;
-                          case Either.Left<InstantiationError, Object>(var error) ->
-                              throw new IllegalStateException("Unreachable");
-                        })
-                .toArray();
-
-        try {
-          yield Either.right(method.invoke(null, argValues));
-        } catch (Exception e) {
-          yield Either.left(new InstantiationError.InvocationException(method, e));
-        }
-      }
+      case Expr.InvokeConstructor<ParsedType>(var method, var args) ->
+          Either.traverse(args, arg -> interpret(context, arg))
+              .flatMap(
+                  argValues -> {
+                    try {
+                      return Either.right(method.invoke(null, argValues.toArray()));
+                    } catch (Exception e) {
+                      return Either.left(new InstantiationError.InvocationException(method, e));
+                    }
+                  });
     };
-  }
-
-  private static List<Candidate> findCandidates(ParsedType target, List<ContextInstance> context) {
-    return Stream.<WitnessRule>concat(
-            context.stream(), reduceOverlapping(findRules(target)).stream())
-        .flatMap(
-            rule ->
-                rule
-                    .tryMatch(target)
-                    .map(requirements -> new Candidate(rule, requirements))
-                    .stream())
-        .toList();
   }
 
   /**
