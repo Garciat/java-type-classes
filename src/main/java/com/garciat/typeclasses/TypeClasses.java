@@ -46,26 +46,26 @@ public class TypeClasses {
     }
   }
 
-  private sealed interface SummonError {
-    record NotFound(ParsedType target) implements SummonError {}
+  private sealed interface ResolutionError {
+    record NotFound(ParsedType target) implements ResolutionError {}
 
-    record Ambiguous(ParsedType target, List<Candidate> candidates) implements SummonError {}
+    record Ambiguous(ParsedType target, List<WitnessRule> candidates) implements ResolutionError {}
 
-    record Nested(ParsedType target, SummonError cause) implements SummonError {}
+    record Nested(ParsedType target, ResolutionError cause) implements ResolutionError {}
 
     default String format() {
       return switch (this) {
         case NotFound(ParsedType target) -> "No witness found for type: " + target.format();
-        case Ambiguous(ParsedType target, List<Candidate> candidates) ->
+        case Ambiguous(ParsedType target, List<WitnessRule> candidates) ->
             "Ambiguous witnesses found for type: "
                 + target.format()
                 + "\nCandidates:\n"
                 + candidates.stream()
-                    .map(c -> c.rule().toString())
+                    .map(WitnessRule::toString)
                     .collect(Collectors.joining("\n"))
                     .indent(2);
-        case Nested(ParsedType target, SummonError cause) ->
-            "While summoning witness for type: "
+        case Nested(ParsedType target, ResolutionError cause) ->
+            "While resolving witness for type: "
                 + target.format()
                 + "\nCaused by: "
                 + cause.format().indent(2);
@@ -73,36 +73,145 @@ public class TypeClasses {
     }
   }
 
+  private sealed interface InstantiationError {
+    record LookupMiss(ParsedType type) implements InstantiationError {}
+
+    record InvocationException(Method method, Exception cause) implements InstantiationError {}
+
+    default String format() {
+      return switch (this) {
+        case LookupMiss(ParsedType type) -> "Context lookup failed for type: " + type.format();
+        case InvocationException(Method method, Exception cause) ->
+            "Failed to invoke constructor: " + method + "\nCause: " + cause.getMessage();
+      };
+    }
+  }
+
+  private sealed interface SummonError {
+    record Resolution(ResolutionError error) implements SummonError {}
+
+    record Instantiation(InstantiationError error) implements SummonError {}
+
+    default String format() {
+      return switch (this) {
+        case Resolution(ResolutionError error) -> error.format();
+        case Instantiation(InstantiationError error) -> error.format();
+      };
+    }
+  }
+
+  /**
+   * Summons a witness for the given target type using the staged resolution approach: parseType >>
+   * resolveWitness >> compile >> interpret
+   */
   private static Either<SummonError, Object> summon(
       ParsedType target, List<ContextInstance> context) {
-    return switch (ZeroOneMore.of(findCandidates(target, context))) {
-      case ZeroOneMore.One<Candidate>(Candidate(var rule, var requirements)) ->
-          summonAll(requirements, context)
-              .map(rule::instantiate)
-              .mapLeft(error -> new SummonError.Nested(target, error));
-      case ZeroOneMore.Zero<Candidate>() -> Either.left(new SummonError.NotFound(target));
-      case ZeroOneMore.More<Candidate>(var candidates) ->
-          Either.left(new SummonError.Ambiguous(target, candidates));
+    Either<SummonError, InstantiationPlan> resolutionResult =
+        resolveWitness(target, context).mapLeft(SummonError.Resolution::new);
+
+    Either<SummonError, Expr<ParsedType>> compilationResult =
+        resolutionResult.map(TypeClasses::compile);
+
+    return compilationResult.flatMap(
+        expr ->
+            interpret(new InterpretContext(context), expr).mapLeft(SummonError.Instantiation::new));
+  }
+
+  // ========== Staged Resolution Components ==========
+
+  /**
+   * Represents the fully resolved instantiation plan. This is a tree structure where each node is a
+   * step in the instantiation process, with dependencies on other steps.
+   */
+  private sealed interface InstantiationPlan {
+    record PlanStep(WitnessRule target, List<InstantiationPlan> dependencies)
+        implements InstantiationPlan {}
+  }
+
+  /**
+   * Represents a reduced AST of interpretable Java operations. This is the compiled form of an
+   * InstantiationPlan.
+   */
+  private sealed interface Expr<K> {
+    record InvokeConstructor<K>(Method method, List<Expr<K>> arguments) implements Expr<K> {}
+
+    record Lookup<K>(K key) implements Expr<K> {}
+  }
+
+  /** Resolves a ParsedType into an InstantiationPlan. */
+  private static Either<ResolutionError, InstantiationPlan> resolveWitness(
+      ParsedType target, List<ContextInstance> context) {
+    record Match(WitnessRule rule, List<ParsedType> requirements) {}
+
+    List<Match> matches =
+        Stream.<WitnessRule>concat(context.stream(), reduceOverlapping(findRules(target)).stream())
+            .flatMap(
+                rule ->
+                    rule
+                        .tryMatch(target)
+                        .map(requirements -> new Match(rule, requirements))
+                        .stream())
+            .toList();
+
+    return switch (ZeroOneMore.of(matches)) {
+      case ZeroOneMore.One<Match>(Match(var rule, var requirements)) ->
+          resolveWitnessAll(requirements, context)
+              .<InstantiationPlan>map(
+                  dependencies -> new InstantiationPlan.PlanStep(rule, dependencies))
+              .mapLeft(error -> new ResolutionError.Nested(target, error));
+      case ZeroOneMore.Zero<Match>() -> Either.left(new ResolutionError.NotFound(target));
+      case ZeroOneMore.More<Match>(var matches2) ->
+          Either.left(
+              new ResolutionError.Ambiguous(target, matches2.stream().map(Match::rule).toList()));
     };
   }
 
-  private static Either<SummonError, List<Object>> summonAll(
+  /** Resolves multiple ParsedTypes into a list of InstantiationPlans. */
+  private static Either<ResolutionError, List<InstantiationPlan>> resolveWitnessAll(
       List<ParsedType> targets, List<ContextInstance> context) {
-    return Either.traverse(targets, target -> summon(target, context));
+    return Either.traverse(targets, target -> resolveWitness(target, context));
   }
 
-  private record Candidate(WitnessRule rule, List<ParsedType> requirements) {}
+  /** Compiles an InstantiationPlan into an Expr. */
+  private static Expr<ParsedType> compile(InstantiationPlan plan) {
+    return switch (plan) {
+      case InstantiationPlan.PlanStep(var rule, var dependencies) ->
+          switch (rule) {
+            case ContextInstance(var instance, var type) -> new Expr.Lookup<>(type);
+            case InstanceConstructor(var func) ->
+                new Expr.InvokeConstructor<>(
+                    func.java(), dependencies.stream().map(TypeClasses::compile).toList());
+          };
+    };
+  }
 
-  private static List<Candidate> findCandidates(ParsedType target, List<ContextInstance> context) {
-    return Stream.<WitnessRule>concat(
-            context.stream(), reduceOverlapping(findRules(target)).stream())
-        .flatMap(
-            rule ->
-                rule
-                    .tryMatch(target)
-                    .map(requirements -> new Candidate(rule, requirements))
-                    .stream())
-        .toList();
+  /**
+   * Context for interpretation - maps keys to resolved instances. For our use case, keys are
+   * ParsedTypes.
+   */
+  private record InterpretContext(List<ContextInstance> instances) {
+    Either<InstantiationError, Object> lookup(ParsedType type) {
+      return instances.stream()
+          .filter(ci -> ci.type().equals(type))
+          .findFirst()
+          .map(ContextInstance::instance)
+          .<Either<InstantiationError, Object>>map(Either::right)
+          .orElseGet(() -> Either.left(new InstantiationError.LookupMiss(type)));
+    }
+  }
+
+  /** Interprets an Expr with a given context. */
+  private static Either<InstantiationError, Object> interpret(
+      InterpretContext context, Expr<ParsedType> expr) {
+    return switch (expr) {
+      case Expr.Lookup<ParsedType>(var type) -> context.lookup(type);
+      case Expr.InvokeConstructor<ParsedType>(var method, var args) ->
+          Either.traverse(args, arg -> interpret(context, arg))
+              .flatMap(
+                  argValues ->
+                      Either.call(() -> method.invoke(null, argValues.toArray()))
+                          .mapLeft(e -> new InstantiationError.InvocationException(method, e)));
+    };
   }
 
   /**
@@ -156,19 +265,12 @@ public class TypeClasses {
 
   private sealed interface WitnessRule {
     Maybe<List<ParsedType>> tryMatch(ParsedType target);
-
-    Object instantiate(List<Object> dependencies);
   }
 
   private record ContextInstance(Object instance, ParsedType type) implements WitnessRule {
     @Override
     public Maybe<List<ParsedType>> tryMatch(ParsedType target) {
       return target.equals(type) ? Maybe.just(List.of()) : Maybe.nothing();
-    }
-
-    @Override
-    public Object instantiate(List<Object> dependencies) {
-      return instance;
     }
 
     @Override
@@ -186,15 +288,6 @@ public class TypeClasses {
     public Maybe<List<ParsedType>> tryMatch(ParsedType target) {
       return Unification.unify(func.returnType(), target)
           .map(map -> Unification.substituteAll(map, func.paramTypes()));
-    }
-
-    @Override
-    public Object instantiate(List<Object> dependencies) {
-      try {
-        return func.java().invoke(null, dependencies.toArray());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
     }
 
     @Override
