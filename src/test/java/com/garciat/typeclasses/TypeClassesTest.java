@@ -216,10 +216,12 @@ final class TypeClassesTest {
   // Test helper classes
   // ============================================
 
+  @SuppressWarnings("NullAway")
   static class NoWitnessType {
     String value;
   }
 
+  @SuppressWarnings("NullAway")
   static class CustomType {
     String value;
 

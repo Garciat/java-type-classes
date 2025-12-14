@@ -8,6 +8,7 @@ import com.garciat.typeclasses.types.F2;
 import com.garciat.typeclasses.types.F3;
 import java.util.List;
 import java.util.function.Function;
+import org.jspecify.annotations.Nullable;
 
 /**
  * @implNote <a href="https://wiki.haskell.org/Varargs">Source</a>
@@ -21,7 +22,8 @@ public interface PrintAll<T> {
   }
 
   @Witness
-  static PrintAll<Void> base() {
+  @SuppressWarnings("NullAway")
+  static PrintAll<@Nullable Void> base() {
     return strings -> {
       for (String s : strings) {
         System.out.println(s);
