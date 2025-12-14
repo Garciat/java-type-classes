@@ -76,6 +76,37 @@ final class UnificationTest {
   }
 
   @Test
+  void unifyAppsWithVar() throws Exception {
+    TypeVariable<?> tv = getTypeVariable();
+    ParsedType.Var var = new ParsedType.Var(tv);
+    ParsedType list1 = new ParsedType.App(new ParsedType.Const(List.class), var);
+    ParsedType list2 =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
+
+    Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(list1, list2);
+
+    assertThat(result).isEqualTo(Maybe.just(Map.of(var, new ParsedType.Const(String.class))));
+  }
+
+  @Test
+  void unifyNestedAppsWithVar() throws Exception {
+    TypeVariable<?> tv = getTypeVariable();
+    ParsedType.Var var = new ParsedType.Var(tv);
+    ParsedType map1 =
+        new ParsedType.App(
+            new ParsedType.App(new ParsedType.Const(Map.class), var),
+            new ParsedType.Const(Integer.class));
+    ParsedType map2 =
+        new ParsedType.App(
+            new ParsedType.App(new ParsedType.Const(Map.class), new ParsedType.Const(String.class)),
+            new ParsedType.Const(Integer.class));
+
+    Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(map1, map2);
+
+    assertThat(result).isEqualTo(Maybe.just(Map.of(var, new ParsedType.Const(String.class))));
+  }
+
+  @Test
   void unifyArrays() {
     ParsedType arr1 = new ParsedType.ArrayOf(new ParsedType.Const(String.class));
     ParsedType arr2 = new ParsedType.ArrayOf(new ParsedType.Const(String.class));
@@ -110,9 +141,8 @@ final class UnificationTest {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType.Var var = new ParsedType.Var(tv);
     ParsedType replacement = new ParsedType.Const(String.class);
-    Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
 
-    ParsedType result = Unification.substitute(map, var);
+    ParsedType result = Unification.substitute(Map.of(var, replacement), var);
 
     assertThat(result).isEqualTo(replacement);
   }
@@ -120,9 +150,8 @@ final class UnificationTest {
   @Test
   void substituteConst() {
     ParsedType type = new ParsedType.Const(String.class);
-    Map<ParsedType.Var, ParsedType> map = Map.of();
 
-    ParsedType result = Unification.substitute(map, type);
+    ParsedType result = Unification.substitute(Map.of(), type);
 
     assertThat(result).isEqualTo(type);
   }
@@ -131,50 +160,47 @@ final class UnificationTest {
   void substituteApp() throws Exception {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType.Var var = new ParsedType.Var(tv);
-    ParsedType app = new ParsedType.App(new ParsedType.Const(List.class), var);
     ParsedType replacement = new ParsedType.Const(String.class);
-    Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
 
-    ParsedType result = Unification.substitute(map, app);
+    ParsedType result =
+        Unification.substitute(
+            Map.of(var, replacement), new ParsedType.App(new ParsedType.Const(List.class), var));
 
-    ParsedType expected = new ParsedType.App(new ParsedType.Const(List.class), replacement);
-    assertThat(result).isEqualTo(expected);
+    assertThat(result).isEqualTo(new ParsedType.App(new ParsedType.Const(List.class), replacement));
   }
 
   @Test
   void substituteArrayOf() throws Exception {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType.Var var = new ParsedType.Var(tv);
-    ParsedType arrayType = new ParsedType.ArrayOf(var);
     ParsedType replacement = new ParsedType.Const(String.class);
-    Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
 
-    ParsedType result = Unification.substitute(map, arrayType);
+    ParsedType result =
+        Unification.substitute(Map.of(var, replacement), new ParsedType.ArrayOf(var));
 
-    ParsedType expected = new ParsedType.ArrayOf(replacement);
-    assertThat(result).isEqualTo(expected);
+    assertThat(result).isEqualTo(new ParsedType.ArrayOf(replacement));
   }
 
   @Test
   void substituteAll() throws Exception {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType.Var var = new ParsedType.Var(tv);
-    List<ParsedType> types =
-        List.of(
-            var,
-            new ParsedType.Const(Integer.class),
-            new ParsedType.App(new ParsedType.Const(List.class), var));
     ParsedType replacement = new ParsedType.Const(String.class);
-    Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
 
-    List<ParsedType> result = Unification.substituteAll(map, types);
+    List<ParsedType> result =
+        Unification.substituteAll(
+            Map.of(var, replacement),
+            List.of(
+                var,
+                new ParsedType.Const(Integer.class),
+                new ParsedType.App(new ParsedType.Const(List.class), var)));
 
-    List<ParsedType> expected =
-        List.of(
-            replacement,
-            new ParsedType.Const(Integer.class),
-            new ParsedType.App(new ParsedType.Const(List.class), replacement));
-    assertThat(result).isEqualTo(expected);
+    assertThat(result)
+        .isEqualTo(
+            List.of(
+                replacement,
+                new ParsedType.Const(Integer.class),
+                new ParsedType.App(new ParsedType.Const(List.class), replacement)));
   }
 
   // Helper to get a type variable for testing

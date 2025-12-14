@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.garciat.typeclasses.api.Ty;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -80,5 +81,42 @@ final class ParsedTypeTest {
             new ParsedType.Const(Integer.class),
             new ParsedType.Primitive(int.class));
     assertThat(result).isEqualTo(expected);
+  }
+
+  @Test
+  void parseTypeVariable() throws Exception {
+    class TestClass<T> {}
+    TypeVariable<?> tv = TestClass.class.getTypeParameters()[0];
+
+    ParsedType result = ParsedType.parse(tv);
+
+    assertThat(result).isEqualTo(new ParsedType.Var(tv));
+  }
+
+  @Test
+  void parseTypeVariableInParameterizedType() throws Exception {
+    class TestClass<T> {
+      List<T> field;
+    }
+    Type fieldType = TestClass.class.getDeclaredField("field").getGenericType();
+    TypeVariable<?> tv = TestClass.class.getTypeParameters()[0];
+
+    ParsedType result = ParsedType.parse(fieldType);
+
+    ParsedType expected =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Var(tv));
+    assertThat(result).isEqualTo(expected);
+  }
+
+  @Test
+  void parseWildcardTypeThrows() throws Exception {
+    class TestClass {
+      List<?> field;
+    }
+    Type fieldType = TestClass.class.getDeclaredField("field").getGenericType();
+
+    assertThatThrownBy(() -> ParsedType.parse(fieldType))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("wildcard");
   }
 }
