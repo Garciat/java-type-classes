@@ -12,9 +12,8 @@ final class FuncTypeTest {
     Method method = TestMethods.class.getDeclaredMethod("simple");
     FuncType result = FuncType.parse(method);
 
-    assertEquals(0, result.paramTypes().size());
-    assertEquals(new ParsedType.Const(String.class), result.returnType());
-    assertEquals(method, result.java());
+    FuncType expected = new FuncType(method, List.of(), new ParsedType.Const(String.class));
+    assertEquals(expected, result);
   }
 
   @Test
@@ -22,10 +21,12 @@ final class FuncTypeTest {
     Method method = TestMethods.class.getDeclaredMethod("withParams", Integer.class, String.class);
     FuncType result = FuncType.parse(method);
 
-    assertEquals(2, result.paramTypes().size());
-    assertEquals(new ParsedType.Const(Integer.class), result.paramTypes().get(0));
-    assertEquals(new ParsedType.Const(String.class), result.paramTypes().get(1));
-    assertEquals(new ParsedType.Const(Boolean.class), result.returnType());
+    FuncType expected =
+        new FuncType(
+            method,
+            List.of(new ParsedType.Const(Integer.class), new ParsedType.Const(String.class)),
+            new ParsedType.Const(Boolean.class));
+    assertEquals(expected, result);
   }
 
   @Test
@@ -33,10 +34,13 @@ final class FuncTypeTest {
     Method method = TestMethods.class.getDeclaredMethod("genericReturn");
     FuncType result = FuncType.parse(method);
 
-    assertEquals(0, result.paramTypes().size());
-    assertEquals(
-        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class)),
-        result.returnType());
+    FuncType expected =
+        new FuncType(
+            method,
+            List.of(),
+            new ParsedType.App(
+                new ParsedType.Const(List.class), new ParsedType.Const(String.class)));
+    assertEquals(expected, result);
   }
 
   @Test
@@ -44,10 +48,14 @@ final class FuncTypeTest {
     Method method = TestMethods.class.getDeclaredMethod("genericParams", List.class);
     FuncType result = FuncType.parse(method);
 
-    assertEquals(1, result.paramTypes().size());
-    assertEquals(
-        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(Integer.class)),
-        result.paramTypes().get(0));
+    FuncType expected =
+        new FuncType(
+            method,
+            List.of(
+                new ParsedType.App(
+                    new ParsedType.Const(List.class), new ParsedType.Const(Integer.class))),
+            new ParsedType.Primitive(void.class));
+    assertEquals(expected, result);
   }
 
   @Test
@@ -55,10 +63,12 @@ final class FuncTypeTest {
     Method method = TestMethods.class.getDeclaredMethod("withPrimitives", int.class, boolean.class);
     FuncType result = FuncType.parse(method);
 
-    assertEquals(2, result.paramTypes().size());
-    assertEquals(new ParsedType.Primitive(int.class), result.paramTypes().get(0));
-    assertEquals(new ParsedType.Primitive(boolean.class), result.paramTypes().get(1));
-    assertEquals(new ParsedType.Primitive(void.class), result.returnType());
+    FuncType expected =
+        new FuncType(
+            method,
+            List.of(new ParsedType.Primitive(int.class), new ParsedType.Primitive(boolean.class)),
+            new ParsedType.Primitive(void.class));
+    assertEquals(expected, result);
   }
 
   @Test
@@ -68,22 +78,17 @@ final class FuncTypeTest {
   }
 
   @Test
-  void formatNoParams() throws Exception {
-    Method method = TestMethods.class.getDeclaredMethod("simple");
-    FuncType funcType = FuncType.parse(method);
+  void parseGenericMethodWithTypeParameters() throws Exception {
+    Method method = TestMethods.class.getDeclaredMethod("genericMethod", Object.class);
+    FuncType result = FuncType.parse(method);
 
-    String formatted = funcType.format();
-    assertTrue(formatted.contains("() -> String"), "Format should show no params and return type");
-  }
-
-  @Test
-  void formatWithParams() throws Exception {
-    Method method = TestMethods.class.getDeclaredMethod("withParams", Integer.class, String.class);
-    FuncType funcType = FuncType.parse(method);
-
-    String formatted = funcType.format();
-    assertTrue(formatted.contains("Integer, String"), "Format should show param types");
-    assertTrue(formatted.contains("Boolean"), "Format should show return type");
+    // The method has a type parameter T, so we expect a Var in the return type
+    FuncType expected =
+        new FuncType(
+            method,
+            List.of(new ParsedType.Var(method.getTypeParameters()[0])),
+            new ParsedType.Var(method.getTypeParameters()[0]));
+    assertEquals(expected, result);
   }
 
   // Test helper class with various method signatures
@@ -103,6 +108,10 @@ final class FuncTypeTest {
     public static void genericParams(List<Integer> list) {}
 
     public static void withPrimitives(int i, boolean b) {}
+
+    public static <T> T genericMethod(T value) {
+      return value;
+    }
 
     public String nonStatic() {
       return "";

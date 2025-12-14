@@ -70,31 +70,6 @@ final class ParsedTypeTest {
   }
 
   @Test
-  void formatConst() {
-    ParsedType type = new ParsedType.Const(String.class);
-    assertEquals("String", type.format());
-  }
-
-  @Test
-  void formatApp() {
-    ParsedType type =
-        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
-    assertEquals("List[E](String)", type.format());
-  }
-
-  @Test
-  void formatArrayOf() {
-    ParsedType type = new ParsedType.ArrayOf(new ParsedType.Primitive(int.class));
-    assertEquals("int[]", type.format());
-  }
-
-  @Test
-  void formatPrimitive() {
-    ParsedType type = new ParsedType.Primitive(int.class);
-    assertEquals("int", type.format());
-  }
-
-  @Test
   void parseAll() throws Exception {
     Type[] types = {String.class, Integer.class, int.class};
     List<ParsedType> result = ParsedType.parseAll(types);

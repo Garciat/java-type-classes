@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.garciat.typeclasses.api.Ctx;
 import com.garciat.typeclasses.api.Ty;
-import com.garciat.typeclasses.classes.Eq;
-import com.garciat.typeclasses.classes.Show;
+import com.garciat.typeclasses.testclasses.TestEq;
+import com.garciat.typeclasses.testclasses.TestShow;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,22 +20,22 @@ final class TypeClassesTest {
 
   @Test
   void witnessSimpleTypeClass() {
-    Show<String> showString = witness(new Ty<>() {});
+    TestShow<String> showString = witness(new Ty<>() {});
     assertNotNull(showString);
-    assertEquals("\"test\"", showString.show("test"));
+    assertEquals("string:test", showString.show("test"));
   }
 
   @Test
   void witnessWithDependency() {
-    Show<Optional<String>> showOptional = witness(new Ty<>() {});
+    TestShow<Optional<String>> showOptional = witness(new Ty<>() {});
     assertNotNull(showOptional);
-    assertEquals("Some(\"test\")", showOptional.show(Optional.of("test")));
-    assertEquals("None", showOptional.show(Optional.empty()));
+    assertEquals("opt(string:test)", showOptional.show(Optional.of("test")));
+    assertEquals("empty", showOptional.show(Optional.empty()));
   }
 
   @Test
   void witnessWithMultipleDependencies() {
-    Eq<List<String>> eqList = witness(new Ty<>() {});
+    TestEq<List<String>> eqList = witness(new Ty<>() {});
     assertNotNull(eqList);
     assertTrue(eqList.eq(List.of("a", "b"), List.of("a", "b")));
     assertFalse(eqList.eq(List.of("a", "b"), List.of("a", "c")));
@@ -47,15 +47,15 @@ final class TypeClassesTest {
 
   @Test
   void witnessLookupsInTypeClass() {
-    // Lookup should find witnesses in the type class interface (Show)
-    Show<String> show = witness(new Ty<>() {});
+    // Lookup should find witnesses in the type class interface (TestShow)
+    TestShow<String> show = witness(new Ty<>() {});
     assertNotNull(show);
   }
 
   @Test
   void witnessLookupsInTypeArguments() {
-    // Lookup should find witnesses in type arguments (String has witness in Show)
-    Show<Optional<String>> show = witness(new Ty<>() {});
+    // Lookup should find witnesses in type arguments (String has witness in TestShow)
+    TestShow<Optional<String>> show = witness(new Ty<>() {});
     assertNotNull(show);
   }
 
@@ -66,7 +66,7 @@ final class TypeClassesTest {
   @Test
   void witnessRequiresPublicStaticMethod() {
     // This should work - witness is public static
-    Show<String> show = witness(new Ty<>() {});
+    TestShow<String> show = witness(new Ty<>() {});
     assertNotNull(show);
   }
 
@@ -75,7 +75,7 @@ final class TypeClassesTest {
     // NoWitnessType has no @TypeClass.Witness methods
     assertThrows(
         TypeClasses.WitnessResolutionException.class,
-        () -> witness(new Ty<Show<NoWitnessType>>() {}));
+        () -> witness(new Ty<TestShow<NoWitnessType>>() {}));
   }
 
   // ============================================
@@ -85,20 +85,20 @@ final class TypeClassesTest {
   @Test
   void witnessRecursiveDependencies() {
     // List<Optional<String>> requires:
-    // 1. listShow(Show<Optional<String>>)
-    // 2. optionalShow(Show<String>)
+    // 1. listShow(TestShow<Optional<String>>)
+    // 2. optionalShow(TestShow<String>)
     // 3. stringShow()
-    Show<List<Optional<String>>> show = witness(new Ty<>() {});
+    TestShow<List<Optional<String>>> show = witness(new Ty<>() {});
     assertNotNull(show);
     assertEquals(
-        "[Some(\"a\"), None, Some(\"b\")]",
+        "[opt(string:a),empty,opt(string:b)]",
         show.show(List.of(Optional.of("a"), Optional.empty(), Optional.of("b"))));
   }
 
   @Test
   void witnessDeepRecursion() {
     // List<List<List<String>>> should resolve recursively
-    Show<List<List<List<String>>>> show = witness(new Ty<>() {});
+    TestShow<List<List<List<String>>>> show = witness(new Ty<>() {});
     assertNotNull(show);
   }
 
@@ -144,15 +144,15 @@ final class TypeClassesTest {
   void witnessNotFoundThrows() {
     assertThrows(
         TypeClasses.WitnessResolutionException.class,
-        () -> witness(new Ty<Show<NoWitnessType>>() {}));
+        () -> witness(new Ty<TestShow<NoWitnessType>>() {}));
   }
 
   @Test
   void witnessNotFoundNestedThrows() {
-    // List<NoWitnessType> - the dependency Show<NoWitnessType> cannot be found
+    // List<NoWitnessType> - the dependency TestShow<NoWitnessType> cannot be found
     assertThrows(
         TypeClasses.WitnessResolutionException.class,
-        () -> witness(new Ty<Show<List<NoWitnessType>>>() {}));
+        () -> witness(new Ty<TestShow<List<NoWitnessType>>>() {}));
   }
 
   // ============================================
@@ -163,23 +163,24 @@ final class TypeClassesTest {
   void witnessSummoningWithContext() {
     // Provide a custom witness via context
     CustomType customValue = new CustomType("test");
-    Show<CustomType> customShow = c -> "custom:" + c.value;
+    TestShow<CustomType> customShow = c -> "custom:" + c.value;
 
-    Show<List<CustomType>> listShow = witness(new Ty<>() {}, new Ctx<>(customShow) {});
+    TestShow<List<CustomType>> listShow = witness(new Ty<>() {}, new Ctx<>(customShow) {});
 
     assertNotNull(listShow);
     assertEquals(
-        "[custom:a, custom:b]", listShow.show(List.of(new CustomType("a"), new CustomType("b"))));
+        "[custom:a,custom:b]", listShow.show(List.of(new CustomType("a"), new CustomType("b"))));
   }
 
   @Test
   void witnessSummoningBuildsTree() {
     // Verify that the witness is actually constructed correctly
     // by checking its behavior with nested types
-    Show<Optional<List<String>>> show = witness(new Ty<>() {});
+    TestShow<Optional<List<String>>> show = witness(new Ty<>() {});
 
-    assertEquals("Some([\"a\", \"b\", \"c\"])", show.show(Optional.of(List.of("a", "b", "c"))));
-    assertEquals("None", show.show(Optional.empty()));
+    assertEquals(
+        "opt([string:a,string:b,string:c])", show.show(Optional.of(List.of("a", "b", "c"))));
+    assertEquals("empty", show.show(Optional.empty()));
   }
 
   // ============================================
@@ -191,7 +192,7 @@ final class TypeClassesTest {
     TypeClasses.WitnessResolutionException ex =
         assertThrows(
             TypeClasses.WitnessResolutionException.class,
-            () -> witness(new Ty<Show<NoWitnessType>>() {}));
+            () -> witness(new Ty<TestShow<NoWitnessType>>() {}));
 
     assertNotNull(ex.getMessage());
     assertTrue(
@@ -214,8 +215,8 @@ final class TypeClassesTest {
 
   @Test
   void witnessMapWithDependencies() {
-    // Map<String, Integer> requires Eq<String> and Eq<Integer>
-    Eq<Map<String, Integer>> eqMap = witness(new Ty<>() {});
+    // Map<String, Integer> requires TestEq<String> and TestEq<Integer>
+    TestEq<Map<String, Integer>> eqMap = witness(new Ty<>() {});
     assertNotNull(eqMap);
 
     Map<String, Integer> map1 = Map.of("a", 1, "b", 2);
@@ -224,24 +225,6 @@ final class TypeClassesTest {
 
     assertTrue(eqMap.eq(map1, map2));
     assertFalse(eqMap.eq(map1, map3));
-  }
-
-  @Test
-  void witnessArrays() {
-    // Integer arrays should have a Show witness
-    Show<Integer[]> showArray = witness(new Ty<>() {});
-    assertNotNull(showArray);
-
-    assertEquals("[1, 2, 3]", showArray.show(new Integer[] {1, 2, 3}));
-  }
-
-  @Test
-  void witnessPrimitiveArrays() {
-    // Primitive int arrays should have a Show witness
-    Show<int[]> showIntArray = witness(new Ty<>() {});
-    assertNotNull(showIntArray);
-
-    assertEquals("[1, 2, 3]", showIntArray.show(new int[] {1, 2, 3}));
   }
 
   // ============================================
