@@ -159,7 +159,6 @@ final class TypeClassesTest {
   @Test
   void witnessSummoningWithContext() {
     // Provide a custom witness via context
-    CustomType customValue = new CustomType("test");
     TestShow<CustomType> customShow = c -> "custom:" + c.value;
 
     TestShow<List<CustomType>> listShow = witness(new Ty<>() {}, new Ctx<>(customShow) {});
