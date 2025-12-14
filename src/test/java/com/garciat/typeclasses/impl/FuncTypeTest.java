@@ -1,6 +1,7 @@
 package com.garciat.typeclasses.impl;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.garciat.typeclasses.impl.ParsedType.App;
 import com.garciat.typeclasses.impl.ParsedType.Const;

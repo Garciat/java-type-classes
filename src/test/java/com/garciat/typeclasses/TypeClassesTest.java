@@ -1,7 +1,8 @@
 package com.garciat.typeclasses;
 
 import static com.garciat.typeclasses.TypeClasses.witness;
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.garciat.typeclasses.api.Ctx;
 import com.garciat.typeclasses.api.Ty;

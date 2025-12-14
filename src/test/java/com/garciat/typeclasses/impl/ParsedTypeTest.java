@@ -1,6 +1,7 @@
 package com.garciat.typeclasses.impl;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.garciat.typeclasses.api.Ty;
 import com.garciat.typeclasses.impl.ParsedType.App;
@@ -18,65 +19,60 @@ import org.junit.jupiter.api.Test;
 final class ParsedTypeTest {
   @Test
   void parseClass() {
-    ParsedType result = ParsedType.parse(String.class);
-    assertThat(result).isEqualTo(new Const(String.class));
+    assertThat(ParsedType.parse(String.class)).isEqualTo(new Const(String.class));
   }
 
   @Test
   void parsePrimitiveType() {
-    ParsedType result = ParsedType.parse(int.class);
-    assertThat(result).isEqualTo(new Primitive(int.class));
+    assertThat(ParsedType.parse(int.class)).isEqualTo(new Primitive(int.class));
   }
 
   @Test
   void parseArrayType() {
-    ParsedType result = ParsedType.parse(int[].class);
-    assertThat(result).isEqualTo(new ArrayOf(new Primitive(int.class)));
+    assertThat(ParsedType.parse(int[].class)).isEqualTo(new ArrayOf(new Primitive(int.class)));
   }
 
   @Test
   void parseObjectArrayType() {
-    ParsedType result = ParsedType.parse(String[].class);
-    assertThat(result).isEqualTo(new ArrayOf(new Const(String.class)));
+    assertThat(ParsedType.parse(String[].class)).isEqualTo(new ArrayOf(new Const(String.class)));
   }
 
   @Test
   void parseParameterizedType() throws Exception {
     Type listType = new Ty<List<String>>() {}.type();
-    ParsedType result = ParsedType.parse(listType);
 
-    ParsedType expected = new App(new Const(List.class), new Const(String.class));
-    assertThat(result).isEqualTo(expected);
+    assertThat(ParsedType.parse(listType))
+        .isEqualTo(new App(new Const(List.class), new Const(String.class)));
   }
 
   @Test
   void parseMultipleTypeParameters() throws Exception {
     Type mapType = new Ty<Map<String, Integer>>() {}.type();
-    ParsedType result = ParsedType.parse(mapType);
 
-    ParsedType expected =
-        new App(new App(new Const(Map.class), new Const(String.class)), new Const(Integer.class));
-    assertThat(result).isEqualTo(expected);
+    assertThat(ParsedType.parse(mapType))
+        .isEqualTo(
+            new App(
+                new App(new Const(Map.class), new Const(String.class)), new Const(Integer.class)));
   }
 
   @Test
   void parseNestedParameterizedType() throws Exception {
     Type nestedType = new Ty<List<Optional<String>>>() {}.type();
-    ParsedType result = ParsedType.parse(nestedType);
 
-    ParsedType expected =
-        new App(new Const(List.class), new App(new Const(Optional.class), new Const(String.class)));
-    assertThat(result).isEqualTo(expected);
+    assertThat(ParsedType.parse(nestedType))
+        .isEqualTo(
+            new App(
+                new Const(List.class),
+                new App(new Const(Optional.class), new Const(String.class))));
   }
 
   @Test
   void parseAll() throws Exception {
     Type[] types = {String.class, Integer.class, int.class};
-    List<ParsedType> result = ParsedType.parseAll(types);
 
-    List<ParsedType> expected =
-        List.of(new Const(String.class), new Const(Integer.class), new Primitive(int.class));
-    assertThat(result).isEqualTo(expected);
+    assertThat(ParsedType.parseAll(types))
+        .isEqualTo(
+            List.of(new Const(String.class), new Const(Integer.class), new Primitive(int.class)));
   }
 
   @Test
@@ -84,9 +80,7 @@ final class ParsedTypeTest {
     class TestClass<T> {}
     TypeVariable<?> tv = TestClass.class.getTypeParameters()[0];
 
-    ParsedType result = ParsedType.parse(tv);
-
-    assertThat(result).isEqualTo(new Var(tv));
+    assertThat(ParsedType.parse(tv)).isEqualTo(new Var(tv));
   }
 
   @Test
@@ -97,10 +91,7 @@ final class ParsedTypeTest {
     Type fieldType = TestClass.class.getDeclaredField("field").getGenericType();
     TypeVariable<?> tv = TestClass.class.getTypeParameters()[0];
 
-    ParsedType result = ParsedType.parse(fieldType);
-
-    ParsedType expected = new App(new Const(List.class), new Var(tv));
-    assertThat(result).isEqualTo(expected);
+    assertThat(ParsedType.parse(fieldType)).isEqualTo(new App(new Const(List.class), new Var(tv)));
   }
 
   @Test
