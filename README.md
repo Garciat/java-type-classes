@@ -1,5 +1,7 @@
 # Type Class resolution for Java
 
+[![codecov](https://codecov.io/gh/Garciat/java-type-classes/branch/main/graph/badge.svg)](https://codecov.io/gh/Garciat/java-type-classes)
+
 See: https://garciat.com/posts/java-type-classes/
 
 The core API of this library is:
