@@ -10,7 +10,9 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 
-public class ConstructorLookup {
+public final class ConstructorLookup {
+  private ConstructorLookup() {}
+
   public static List<InstanceConstructor> findRules(ParsedType target) {
     return switch (target) {
       case ParsedType.App(var fun, var arg) -> Lists.concat(findRules(fun), findRules(arg));

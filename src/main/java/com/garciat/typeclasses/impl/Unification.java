@@ -6,7 +6,9 @@ import com.garciat.typeclasses.types.Pair;
 import java.util.List;
 import java.util.Map;
 
-public class Unification {
+public final class Unification {
+  private Unification() {}
+
   public static Maybe<Map<ParsedType.Var, ParsedType>> unify(ParsedType t1, ParsedType t2) {
     return switch (Pair.of(t1, t2)) {
       case Pair<ParsedType, ParsedType>(ParsedType.Var var1, ParsedType.Primitive p) ->

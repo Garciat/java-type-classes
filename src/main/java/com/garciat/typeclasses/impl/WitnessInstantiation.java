@@ -9,7 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class WitnessInstantiation {
+public final class WitnessInstantiation {
+  private WitnessInstantiation() {}
+
   /** Compiles an InstantiationPlan into an Expr. */
   public static Expr<ParsedType> compile(InstantiationPlan plan) {
     return switch (plan) {
