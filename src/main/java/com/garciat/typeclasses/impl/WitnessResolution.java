@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class WitnessResolution {
+public final class WitnessResolution {
+  private WitnessResolution() {}
+
   /** Resolves a ParsedType into an InstantiationPlan. */
   public static Either<ResolutionError, InstantiationPlan> resolve(
       ParsedType target, List<ContextInstance> context) {

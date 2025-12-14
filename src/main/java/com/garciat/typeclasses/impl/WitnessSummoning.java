@@ -4,7 +4,9 @@ import com.garciat.typeclasses.impl.WitnessRule.ContextInstance;
 import com.garciat.typeclasses.types.Either;
 import java.util.List;
 
-public class WitnessSummoning {
+public final class WitnessSummoning {
+  private WitnessSummoning() {}
+
   public static Either<SummonError, Object> summon(
       ParsedType target, List<ContextInstance> context) {
     return WitnessResolution.resolve(target, context)

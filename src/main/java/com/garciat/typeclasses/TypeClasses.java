@@ -10,7 +10,9 @@ import com.garciat.typeclasses.types.Either;
 import java.util.Arrays;
 import java.util.List;
 
-public class TypeClasses {
+public final class TypeClasses {
+  private TypeClasses() {}
+
   public static <T> T witness(Ty<T> ty, Ctx<?>... context) {
     return switch (WitnessSummoning.summon(ParsedType.parse(ty.type()), parseContext(context))) {
       case Either.Left<SummonError, Object>(SummonError error) ->

@@ -6,7 +6,9 @@ import static com.garciat.typeclasses.api.TypeClass.Witness.Overlap.OVERLAPPING;
 import com.garciat.typeclasses.impl.WitnessRule.InstanceConstructor;
 import java.util.List;
 
-public class OverlappingInstances {
+public final class OverlappingInstances {
+  private OverlappingInstances() {}
+
   /**
    * @implSpec <a href=
    *     "https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/instances.html#overlapping-instances">6.8.8.5.
