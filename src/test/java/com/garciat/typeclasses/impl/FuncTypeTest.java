@@ -35,12 +35,8 @@ final class FuncTypeTest {
 
     assertEquals(0, result.paramTypes().size());
     assertEquals(
-        new ParsedType.App(
-            new ParsedType.Const(List.class),
-            new ParsedType.Const(String.class)
-        ),
-        result.returnType()
-    );
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class)),
+        result.returnType());
   }
 
   @Test
@@ -50,12 +46,8 @@ final class FuncTypeTest {
 
     assertEquals(1, result.paramTypes().size());
     assertEquals(
-        new ParsedType.App(
-            new ParsedType.Const(List.class),
-            new ParsedType.Const(Integer.class)
-        ),
-        result.paramTypes().get(0)
-    );
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(Integer.class)),
+        result.paramTypes().get(0));
   }
 
   @Test
@@ -79,7 +71,7 @@ final class FuncTypeTest {
   void formatNoParams() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("simple");
     FuncType funcType = FuncType.parse(method);
-    
+
     String formatted = funcType.format();
     assertTrue(formatted.contains("() -> String"), "Format should show no params and return type");
   }
@@ -88,7 +80,7 @@ final class FuncTypeTest {
   void formatWithParams() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("withParams", Integer.class, String.class);
     FuncType funcType = FuncType.parse(method);
-    
+
     String formatted = funcType.format();
     assertTrue(formatted.contains("Integer, String"), "Format should show param types");
     assertTrue(formatted.contains("Boolean"), "Format should show return type");

@@ -90,7 +90,8 @@ final class TypeClassesTest {
     // 3. stringShow()
     Show<List<Optional<String>>> show = witness(new Ty<>() {});
     assertNotNull(show);
-    assertEquals("[Some(\"a\"), None, Some(\"b\")]",
+    assertEquals(
+        "[Some(\"a\"), None, Some(\"b\")]",
         show.show(List.of(Optional.of("a"), Optional.empty(), Optional.of("b"))));
   }
 
@@ -164,12 +165,11 @@ final class TypeClassesTest {
     CustomType customValue = new CustomType("test");
     Show<CustomType> customShow = c -> "custom:" + c.value;
 
-    Show<List<CustomType>> listShow =
-        witness(new Ty<>() {}, new Ctx<>(customShow) {});
+    Show<List<CustomType>> listShow = witness(new Ty<>() {}, new Ctx<>(customShow) {});
 
     assertNotNull(listShow);
-    assertEquals("[custom:a, custom:b]",
-        listShow.show(List.of(new CustomType("a"), new CustomType("b"))));
+    assertEquals(
+        "[custom:a, custom:b]", listShow.show(List.of(new CustomType("a"), new CustomType("b"))));
   }
 
   @Test
@@ -188,23 +188,27 @@ final class TypeClassesTest {
 
   @Test
   void witnessResolutionExceptionHasMessage() {
-    TypeClasses.WitnessResolutionException ex = assertThrows(
-        TypeClasses.WitnessResolutionException.class,
-        () -> witness(new Ty<Show<NoWitnessType>>() {}));
+    TypeClasses.WitnessResolutionException ex =
+        assertThrows(
+            TypeClasses.WitnessResolutionException.class,
+            () -> witness(new Ty<Show<NoWitnessType>>() {}));
 
     assertNotNull(ex.getMessage());
-    assertTrue(ex.getMessage().contains("NoWitnessType"),
+    assertTrue(
+        ex.getMessage().contains("NoWitnessType"),
         "Error message should mention the type that failed: " + ex.getMessage());
   }
 
   @Test
   void witnessResolutionExceptionForAmbiguous() {
-    TypeClasses.WitnessResolutionException ex = assertThrows(
-        TypeClasses.WitnessResolutionException.class,
-        () -> witness(new Ty<com.garciat.typeclasses.testclasses.AmbiguousShow<String>>() {}));
+    TypeClasses.WitnessResolutionException ex =
+        assertThrows(
+            TypeClasses.WitnessResolutionException.class,
+            () -> witness(new Ty<com.garciat.typeclasses.testclasses.AmbiguousShow<String>>() {}));
 
     assertNotNull(ex.getMessage());
-    assertTrue(ex.getMessage().toLowerCase().contains("ambiguous"),
+    assertTrue(
+        ex.getMessage().toLowerCase().contains("ambiguous"),
         "Error message should mention ambiguity: " + ex.getMessage());
   }
 
@@ -228,7 +232,7 @@ final class TypeClassesTest {
     Show<Integer[]> showArray = witness(new Ty<>() {});
     assertNotNull(showArray);
 
-    assertEquals("[1, 2, 3]", showArray.show(new Integer[]{1, 2, 3}));
+    assertEquals("[1, 2, 3]", showArray.show(new Integer[] {1, 2, 3}));
   }
 
   @Test
@@ -237,7 +241,7 @@ final class TypeClassesTest {
     Show<int[]> showIntArray = witness(new Ty<>() {});
     assertNotNull(showIntArray);
 
-    assertEquals("[1, 2, 3]", showIntArray.show(new int[]{1, 2, 3}));
+    assertEquals("[1, 2, 3]", showIntArray.show(new int[] {1, 2, 3}));
   }
 
   // ============================================
@@ -250,6 +254,7 @@ final class TypeClassesTest {
 
   static class CustomType {
     String value;
+
     CustomType(String value) {
       this.value = value;
     }

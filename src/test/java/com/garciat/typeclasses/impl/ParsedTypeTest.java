@@ -25,28 +25,22 @@ final class ParsedTypeTest {
   @Test
   void parseArrayType() {
     ParsedType result = ParsedType.parse(int[].class);
-    assertEquals(
-        new ParsedType.ArrayOf(new ParsedType.Primitive(int.class)),
-        result);
+    assertEquals(new ParsedType.ArrayOf(new ParsedType.Primitive(int.class)), result);
   }
 
   @Test
   void parseObjectArrayType() {
     ParsedType result = ParsedType.parse(String[].class);
-    assertEquals(
-        new ParsedType.ArrayOf(new ParsedType.Const(String.class)),
-        result);
+    assertEquals(new ParsedType.ArrayOf(new ParsedType.Const(String.class)), result);
   }
 
   @Test
   void parseParameterizedType() throws Exception {
     Type listType = new TypeToken<List<String>>() {}.type();
     ParsedType result = ParsedType.parse(listType);
-    
-    ParsedType expected = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        new ParsedType.Const(String.class)
-    );
+
+    ParsedType expected =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
     assertEquals(expected, result);
   }
 
@@ -54,14 +48,11 @@ final class ParsedTypeTest {
   void parseMultipleTypeParameters() throws Exception {
     Type mapType = new TypeToken<Map<String, Integer>>() {}.type();
     ParsedType result = ParsedType.parse(mapType);
-    
-    ParsedType expected = new ParsedType.App(
+
+    ParsedType expected =
         new ParsedType.App(
-            new ParsedType.Const(Map.class),
-            new ParsedType.Const(String.class)
-        ),
-        new ParsedType.Const(Integer.class)
-    );
+            new ParsedType.App(new ParsedType.Const(Map.class), new ParsedType.Const(String.class)),
+            new ParsedType.Const(Integer.class));
     assertEquals(expected, result);
   }
 
@@ -69,14 +60,12 @@ final class ParsedTypeTest {
   void parseNestedParameterizedType() throws Exception {
     Type nestedType = new TypeToken<List<Optional<String>>>() {}.type();
     ParsedType result = ParsedType.parse(nestedType);
-    
-    ParsedType expected = new ParsedType.App(
-        new ParsedType.Const(List.class),
+
+    ParsedType expected =
         new ParsedType.App(
-            new ParsedType.Const(Optional.class),
-            new ParsedType.Const(String.class)
-        )
-    );
+            new ParsedType.Const(List.class),
+            new ParsedType.App(
+                new ParsedType.Const(Optional.class), new ParsedType.Const(String.class)));
     assertEquals(expected, result);
   }
 
@@ -88,10 +77,8 @@ final class ParsedTypeTest {
 
   @Test
   void formatApp() {
-    ParsedType type = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        new ParsedType.Const(String.class)
-    );
+    ParsedType type =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
     assertEquals("List[E](String)", type.format());
   }
 
@@ -111,12 +98,12 @@ final class ParsedTypeTest {
   void parseAll() throws Exception {
     Type[] types = {String.class, Integer.class, int.class};
     List<ParsedType> result = ParsedType.parseAll(types);
-    
-    List<ParsedType> expected = List.of(
-        new ParsedType.Const(String.class),
-        new ParsedType.Const(Integer.class),
-        new ParsedType.Primitive(int.class)
-    );
+
+    List<ParsedType> expected =
+        List.of(
+            new ParsedType.Const(String.class),
+            new ParsedType.Const(Integer.class),
+            new ParsedType.Primitive(int.class));
     assertEquals(expected, result);
   }
 

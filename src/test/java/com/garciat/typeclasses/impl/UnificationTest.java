@@ -13,9 +13,9 @@ final class UnificationTest {
   void unifyEqualConsts() {
     ParsedType t1 = new ParsedType.Const(String.class);
     ParsedType t2 = new ParsedType.Const(String.class);
-    
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
-    
+
     assertTrue(result instanceof Maybe.Just);
     assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
   }
@@ -24,9 +24,9 @@ final class UnificationTest {
   void unifyDifferentConsts() {
     ParsedType t1 = new ParsedType.Const(String.class);
     ParsedType t2 = new ParsedType.Const(Integer.class);
-    
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
-    
+
     assertTrue(result instanceof Maybe.Nothing);
   }
 
@@ -35,11 +35,12 @@ final class UnificationTest {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType t1 = new ParsedType.Var(tv);
     ParsedType t2 = new ParsedType.Const(String.class);
-    
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
-    
+
     assertTrue(result instanceof Maybe.Just);
-    Map<ParsedType.Var, ParsedType> map = ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value();
+    Map<ParsedType.Var, ParsedType> map =
+        ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value();
     assertEquals(1, map.size());
     assertEquals(t2, map.get(t1));
   }
@@ -49,42 +50,34 @@ final class UnificationTest {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType t1 = new ParsedType.Var(tv);
     ParsedType t2 = new ParsedType.Primitive(int.class);
-    
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
-    
+
     assertTrue(result instanceof Maybe.Nothing);
   }
 
   @Test
   void unifyApps() {
-    ParsedType list1 = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        new ParsedType.Const(String.class)
-    );
-    ParsedType list2 = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        new ParsedType.Const(String.class)
-    );
-    
+    ParsedType list1 =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
+    ParsedType list2 =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(list1, list2);
-    
+
     assertTrue(result instanceof Maybe.Just);
     assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
   }
 
   @Test
   void unifyAppsDifferentArgs() {
-    ParsedType list1 = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        new ParsedType.Const(String.class)
-    );
-    ParsedType list2 = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        new ParsedType.Const(Integer.class)
-    );
-    
+    ParsedType list1 =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
+    ParsedType list2 =
+        new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(Integer.class));
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(list1, list2);
-    
+
     assertTrue(result instanceof Maybe.Nothing);
   }
 
@@ -92,9 +85,9 @@ final class UnificationTest {
   void unifyArrays() {
     ParsedType arr1 = new ParsedType.ArrayOf(new ParsedType.Const(String.class));
     ParsedType arr2 = new ParsedType.ArrayOf(new ParsedType.Const(String.class));
-    
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(arr1, arr2);
-    
+
     assertTrue(result instanceof Maybe.Just);
     assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
   }
@@ -103,9 +96,9 @@ final class UnificationTest {
   void unifyPrimitives() {
     ParsedType p1 = new ParsedType.Primitive(int.class);
     ParsedType p2 = new ParsedType.Primitive(int.class);
-    
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(p1, p2);
-    
+
     assertTrue(result instanceof Maybe.Just);
     assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
   }
@@ -114,9 +107,9 @@ final class UnificationTest {
   void unifyDifferentPrimitives() {
     ParsedType p1 = new ParsedType.Primitive(int.class);
     ParsedType p2 = new ParsedType.Primitive(boolean.class);
-    
+
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(p1, p2);
-    
+
     assertTrue(result instanceof Maybe.Nothing);
   }
 
@@ -126,9 +119,9 @@ final class UnificationTest {
     ParsedType.Var var = new ParsedType.Var(tv);
     ParsedType replacement = new ParsedType.Const(String.class);
     Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
-    
+
     ParsedType result = Unification.substitute(map, var);
-    
+
     assertEquals(replacement, result);
   }
 
@@ -136,9 +129,9 @@ final class UnificationTest {
   void substituteConst() {
     ParsedType type = new ParsedType.Const(String.class);
     Map<ParsedType.Var, ParsedType> map = Map.of();
-    
+
     ParsedType result = Unification.substitute(map, type);
-    
+
     assertEquals(type, result);
   }
 
@@ -146,19 +139,13 @@ final class UnificationTest {
   void substituteApp() throws Exception {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType.Var var = new ParsedType.Var(tv);
-    ParsedType app = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        var
-    );
+    ParsedType app = new ParsedType.App(new ParsedType.Const(List.class), var);
     ParsedType replacement = new ParsedType.Const(String.class);
     Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
-    
+
     ParsedType result = Unification.substitute(map, app);
-    
-    ParsedType expected = new ParsedType.App(
-        new ParsedType.Const(List.class),
-        replacement
-    );
+
+    ParsedType expected = new ParsedType.App(new ParsedType.Const(List.class), replacement);
     assertEquals(expected, result);
   }
 
@@ -169,9 +156,9 @@ final class UnificationTest {
     ParsedType arrayType = new ParsedType.ArrayOf(var);
     ParsedType replacement = new ParsedType.Const(String.class);
     Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
-    
+
     ParsedType result = Unification.substitute(map, arrayType);
-    
+
     ParsedType expected = new ParsedType.ArrayOf(replacement);
     assertEquals(expected, result);
   }
@@ -180,21 +167,21 @@ final class UnificationTest {
   void substituteAll() throws Exception {
     TypeVariable<?> tv = getTypeVariable();
     ParsedType.Var var = new ParsedType.Var(tv);
-    List<ParsedType> types = List.of(
-        var,
-        new ParsedType.Const(Integer.class),
-        new ParsedType.App(new ParsedType.Const(List.class), var)
-    );
+    List<ParsedType> types =
+        List.of(
+            var,
+            new ParsedType.Const(Integer.class),
+            new ParsedType.App(new ParsedType.Const(List.class), var));
     ParsedType replacement = new ParsedType.Const(String.class);
     Map<ParsedType.Var, ParsedType> map = Map.of(var, replacement);
-    
+
     List<ParsedType> result = Unification.substituteAll(map, types);
-    
-    List<ParsedType> expected = List.of(
-        replacement,
-        new ParsedType.Const(Integer.class),
-        new ParsedType.App(new ParsedType.Const(List.class), replacement)
-    );
+
+    List<ParsedType> expected =
+        List.of(
+            replacement,
+            new ParsedType.Const(Integer.class),
+            new ParsedType.App(new ParsedType.Const(List.class), replacement));
     assertEquals(expected, result);
   }
 
