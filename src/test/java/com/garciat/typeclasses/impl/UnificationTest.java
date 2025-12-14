@@ -16,8 +16,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertTrue(result instanceof Maybe.Just);
-    assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
+    assertEquals(Maybe.just(Map.of()), result);
   }
 
   @Test
@@ -27,7 +26,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertTrue(result instanceof Maybe.Nothing);
+    assertEquals(Maybe.nothing(), result);
   }
 
   @Test
@@ -38,11 +37,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertTrue(result instanceof Maybe.Just);
-    Map<ParsedType.Var, ParsedType> map =
-        ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value();
-    assertEquals(1, map.size());
-    assertEquals(t2, map.get(t1));
+    assertEquals(Maybe.just(Map.of(t1, t2)), result);
   }
 
   @Test
@@ -53,7 +48,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertTrue(result instanceof Maybe.Nothing);
+    assertEquals(Maybe.nothing(), result);
   }
 
   @Test
@@ -65,8 +60,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(list1, list2);
 
-    assertTrue(result instanceof Maybe.Just);
-    assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
+    assertEquals(Maybe.just(Map.of()), result);
   }
 
   @Test
@@ -78,7 +72,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(list1, list2);
 
-    assertTrue(result instanceof Maybe.Nothing);
+    assertEquals(Maybe.nothing(), result);
   }
 
   @Test
@@ -88,8 +82,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(arr1, arr2);
 
-    assertTrue(result instanceof Maybe.Just);
-    assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
+    assertEquals(Maybe.just(Map.of()), result);
   }
 
   @Test
@@ -99,8 +92,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(p1, p2);
 
-    assertTrue(result instanceof Maybe.Just);
-    assertEquals(Map.of(), ((Maybe.Just<Map<ParsedType.Var, ParsedType>>) result).value());
+    assertEquals(Maybe.just(Map.of()), result);
   }
 
   @Test
@@ -110,7 +102,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(p1, p2);
 
-    assertTrue(result instanceof Maybe.Nothing);
+    assertEquals(Maybe.nothing(), result);
   }
 
   @Test

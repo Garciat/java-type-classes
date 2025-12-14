@@ -2,7 +2,7 @@ package com.garciat.typeclasses.impl;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.lang.reflect.ParameterizedType;
+import com.garciat.typeclasses.api.Ty;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +36,7 @@ final class ParsedTypeTest {
 
   @Test
   void parseParameterizedType() throws Exception {
-    Type listType = new TypeToken<List<String>>() {}.type();
+    Type listType = new Ty<List<String>>() {}.type();
     ParsedType result = ParsedType.parse(listType);
 
     ParsedType expected =
@@ -46,7 +46,7 @@ final class ParsedTypeTest {
 
   @Test
   void parseMultipleTypeParameters() throws Exception {
-    Type mapType = new TypeToken<Map<String, Integer>>() {}.type();
+    Type mapType = new Ty<Map<String, Integer>>() {}.type();
     ParsedType result = ParsedType.parse(mapType);
 
     ParsedType expected =
@@ -58,7 +58,7 @@ final class ParsedTypeTest {
 
   @Test
   void parseNestedParameterizedType() throws Exception {
-    Type nestedType = new TypeToken<List<Optional<String>>>() {}.type();
+    Type nestedType = new Ty<List<Optional<String>>>() {}.type();
     ParsedType result = ParsedType.parse(nestedType);
 
     ParsedType expected =
@@ -105,16 +105,5 @@ final class ParsedTypeTest {
             new ParsedType.Const(Integer.class),
             new ParsedType.Primitive(int.class));
     assertEquals(expected, result);
-  }
-
-  // Helper class to capture generic type information
-  private abstract static class TypeToken<T> {
-    Type type() {
-      Type superclass = getClass().getGenericSuperclass();
-      if (superclass instanceof ParameterizedType pt) {
-        return pt.getActualTypeArguments()[0];
-      }
-      throw new IllegalStateException("TypeToken requires type parameter");
-    }
   }
 }
