@@ -2,6 +2,10 @@ package com.garciat.typeclasses.impl;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.garciat.typeclasses.impl.ParsedType.App;
+import com.garciat.typeclasses.impl.ParsedType.Const;
+import com.garciat.typeclasses.impl.ParsedType.Primitive;
+import com.garciat.typeclasses.impl.ParsedType.Var;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -10,65 +14,55 @@ final class FuncTypeTest {
   @Test
   void parseSimpleStaticMethod() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("simple");
-    FuncType result = FuncType.parse(method);
 
-    FuncType expected = new FuncType(method, List.of(), new ParsedType.Const(String.class));
-    assertThat(result).isEqualTo(expected);
+    assertThat(FuncType.parse(method))
+        .isEqualTo(new FuncType(method, List.of(), new Const(String.class)));
   }
 
   @Test
   void parseMethodWithParameters() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("withParams", Integer.class, String.class);
-    FuncType result = FuncType.parse(method);
 
-    FuncType expected =
-        new FuncType(
-            method,
-            List.of(new ParsedType.Const(Integer.class), new ParsedType.Const(String.class)),
-            new ParsedType.Const(Boolean.class));
-    assertThat(result).isEqualTo(expected);
+    assertThat(FuncType.parse(method))
+        .isEqualTo(
+            new FuncType(
+                method,
+                List.of(new Const(Integer.class), new Const(String.class)),
+                new Const(Boolean.class)));
   }
 
   @Test
   void parseMethodWithGenericReturn() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("genericReturn");
-    FuncType result = FuncType.parse(method);
 
-    FuncType expected =
-        new FuncType(
-            method,
-            List.of(),
-            new ParsedType.App(
-                new ParsedType.Const(List.class), new ParsedType.Const(String.class)));
-    assertThat(result).isEqualTo(expected);
+    assertThat(FuncType.parse(method))
+        .isEqualTo(
+            new FuncType(
+                method, List.of(), new App(new Const(List.class), new Const(String.class))));
   }
 
   @Test
   void parseMethodWithGenericParams() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("genericParams", List.class);
-    FuncType result = FuncType.parse(method);
 
-    FuncType expected =
-        new FuncType(
-            method,
-            List.of(
-                new ParsedType.App(
-                    new ParsedType.Const(List.class), new ParsedType.Const(Integer.class))),
-            new ParsedType.Primitive(void.class));
-    assertThat(result).isEqualTo(expected);
+    assertThat(FuncType.parse(method))
+        .isEqualTo(
+            new FuncType(
+                method,
+                List.of(new App(new Const(List.class), new Const(Integer.class))),
+                new Primitive(void.class)));
   }
 
   @Test
   void parseMethodWithPrimitives() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("withPrimitives", int.class, boolean.class);
-    FuncType result = FuncType.parse(method);
 
-    FuncType expected =
-        new FuncType(
-            method,
-            List.of(new ParsedType.Primitive(int.class), new ParsedType.Primitive(boolean.class)),
-            new ParsedType.Primitive(void.class));
-    assertThat(result).isEqualTo(expected);
+    assertThat(FuncType.parse(method))
+        .isEqualTo(
+            new FuncType(
+                method,
+                List.of(new Primitive(int.class), new Primitive(boolean.class)),
+                new Primitive(void.class)));
   }
 
   @Test
@@ -80,15 +74,14 @@ final class FuncTypeTest {
   @Test
   void parseGenericMethodWithTypeParameters() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("genericMethod", Object.class);
-    FuncType result = FuncType.parse(method);
 
     // The method has a type parameter T, so we expect a Var in the return type
-    FuncType expected =
-        new FuncType(
-            method,
-            List.of(new ParsedType.Var(method.getTypeParameters()[0])),
-            new ParsedType.Var(method.getTypeParameters()[0]));
-    assertThat(result).isEqualTo(expected);
+    assertThat(FuncType.parse(method))
+        .isEqualTo(
+            new FuncType(
+                method,
+                List.of(new Var(method.getTypeParameters()[0])),
+                new Var(method.getTypeParameters()[0])));
   }
 
   // Test helper class with various method signatures
