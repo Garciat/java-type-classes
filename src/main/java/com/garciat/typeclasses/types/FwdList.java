@@ -1,6 +1,7 @@
 package com.garciat.typeclasses.types;
 
 import static com.garciat.typeclasses.api.TypeClass.Witness.Overlap.OVERLAPPING;
+import static com.garciat.typeclasses.types.Unit.unit;
 
 import com.garciat.typeclasses.api.hkt.Kind;
 import com.garciat.typeclasses.api.hkt.Kind.KArr;
@@ -47,12 +48,12 @@ public sealed interface FwdList<A> extends TApp<FwdList.Tag, A> {
   }
 
   default void forEach(Consumer<A> action) {
-    this.<Void>match(
-        () -> null,
+    this.<Unit>match(
+        () -> unit(),
         (head, tail) -> {
           action.accept(head);
           tail.forEach(action);
-          return null;
+          return unit();
         });
   }
 

@@ -18,6 +18,7 @@ import com.garciat.typeclasses.types.FwdList;
 import com.garciat.typeclasses.types.JavaList;
 import com.garciat.typeclasses.types.Maybe;
 import com.garciat.typeclasses.types.Sum;
+import com.garciat.typeclasses.types.Unit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -70,7 +71,7 @@ final class ExamplesTest {
     F3<Integer, Integer, Integer, Integer> sum = SumAllInt.of(witness(new Ty<>() {}));
     System.out.println(sum.apply(1, 2, 3));
 
-    F3<String, JavaList<String>, Integer, Void> printer = PrintAll.of(witness(new Ty<>() {}));
+    F3<String, JavaList<String>, Integer, Unit> printer = PrintAll.of(witness(new Ty<>() {}));
     printer.apply("Items:", JavaList.of("apple", "banana", "cherry"), 0);
 
     Foldable<FwdList.Tag> foldableFwdList = witness(new Ty<>() {});

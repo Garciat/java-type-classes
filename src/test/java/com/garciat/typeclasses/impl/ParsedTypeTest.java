@@ -77,6 +77,7 @@ final class ParsedTypeTest {
 
   @Test
   void parseTypeVariableInParameterizedType() throws Exception {
+    @SuppressWarnings("NullAway")
     class TestClass<T> {
       List<T> field;
     }
@@ -88,6 +89,7 @@ final class ParsedTypeTest {
 
   @Test
   void parseWildcardTypeThrows() throws Exception {
+    @SuppressWarnings("NullAway")
     class TestClass {
       List<?> field;
     }
