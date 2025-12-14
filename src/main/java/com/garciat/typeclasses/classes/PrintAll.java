@@ -1,14 +1,16 @@
 package com.garciat.typeclasses.classes;
 
+import static com.garciat.typeclasses.types.Unit.unit;
+
 import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.api.TypeClass.Witness;
 import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.types.F1;
 import com.garciat.typeclasses.types.F2;
 import com.garciat.typeclasses.types.F3;
+import com.garciat.typeclasses.types.Unit;
 import java.util.List;
 import java.util.function.Function;
-import org.jspecify.annotations.Nullable;
 
 /**
  * @implNote <a href="https://wiki.haskell.org/Varargs">Source</a>
@@ -22,13 +24,12 @@ public interface PrintAll<T> {
   }
 
   @Witness
-  @SuppressWarnings("NullAway")
-  static PrintAll<@Nullable Void> base() {
+  static PrintAll<Unit> base() {
     return strings -> {
       for (String s : strings) {
         System.out.println(s);
       }
-      return null;
+      return unit();
     };
   }
 
