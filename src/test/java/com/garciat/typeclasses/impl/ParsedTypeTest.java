@@ -39,17 +39,13 @@ final class ParsedTypeTest {
 
   @Test
   void parseParameterizedType() throws Exception {
-    Type listType = new Ty<List<String>>() {}.type();
-
-    assertThat(ParsedType.parse(listType))
+    assertThat(ParsedType.parse(new Ty<List<String>>() {}.type()))
         .isEqualTo(new App(new Const(List.class), new Const(String.class)));
   }
 
   @Test
   void parseMultipleTypeParameters() throws Exception {
-    Type mapType = new Ty<Map<String, Integer>>() {}.type();
-
-    assertThat(ParsedType.parse(mapType))
+    assertThat(ParsedType.parse(new Ty<Map<String, Integer>>() {}.type()))
         .isEqualTo(
             new App(
                 new App(new Const(Map.class), new Const(String.class)), new Const(Integer.class)));
@@ -57,9 +53,7 @@ final class ParsedTypeTest {
 
   @Test
   void parseNestedParameterizedType() throws Exception {
-    Type nestedType = new Ty<List<Optional<String>>>() {}.type();
-
-    assertThat(ParsedType.parse(nestedType))
+    assertThat(ParsedType.parse(new Ty<List<Optional<String>>>() {}.type()))
         .isEqualTo(
             new App(
                 new Const(List.class),
@@ -68,9 +62,7 @@ final class ParsedTypeTest {
 
   @Test
   void parseAll() throws Exception {
-    Type[] types = {String.class, Integer.class, int.class};
-
-    assertThat(ParsedType.parseAll(types))
+    assertThat(ParsedType.parseAll(new Type[] {String.class, Integer.class, int.class}))
         .isEqualTo(
             List.of(new Const(String.class), new Const(Integer.class), new Primitive(int.class)));
   }
@@ -88,10 +80,10 @@ final class ParsedTypeTest {
     class TestClass<T> {
       List<T> field;
     }
-    Type fieldType = TestClass.class.getDeclaredField("field").getGenericType();
     TypeVariable<?> tv = TestClass.class.getTypeParameters()[0];
 
-    assertThat(ParsedType.parse(fieldType)).isEqualTo(new App(new Const(List.class), new Var(tv)));
+    assertThat(ParsedType.parse(TestClass.class.getDeclaredField("field").getGenericType()))
+        .isEqualTo(new App(new Const(List.class), new Var(tv)));
   }
 
   @Test
@@ -99,9 +91,9 @@ final class ParsedTypeTest {
     class TestClass {
       List<?> field;
     }
-    Type fieldType = TestClass.class.getDeclaredField("field").getGenericType();
 
-    assertThatThrownBy(() -> ParsedType.parse(fieldType))
+    assertThatThrownBy(
+            () -> ParsedType.parse(TestClass.class.getDeclaredField("field").getGenericType()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("wildcard");
   }
