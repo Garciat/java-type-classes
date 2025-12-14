@@ -1,6 +1,6 @@
 package com.garciat.typeclasses.impl;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import com.garciat.typeclasses.api.Ty;
 import java.lang.reflect.Type;
@@ -13,25 +13,25 @@ final class ParsedTypeTest {
   @Test
   void parseClass() {
     ParsedType result = ParsedType.parse(String.class);
-    assertEquals(new ParsedType.Const(String.class), result);
+    assertThat(result).isEqualTo(new ParsedType.Const(String.class));
   }
 
   @Test
   void parsePrimitiveType() {
     ParsedType result = ParsedType.parse(int.class);
-    assertEquals(new ParsedType.Primitive(int.class), result);
+    assertThat(result).isEqualTo(new ParsedType.Primitive(int.class));
   }
 
   @Test
   void parseArrayType() {
     ParsedType result = ParsedType.parse(int[].class);
-    assertEquals(new ParsedType.ArrayOf(new ParsedType.Primitive(int.class)), result);
+    assertThat(result).isEqualTo(new ParsedType.ArrayOf(new ParsedType.Primitive(int.class)));
   }
 
   @Test
   void parseObjectArrayType() {
     ParsedType result = ParsedType.parse(String[].class);
-    assertEquals(new ParsedType.ArrayOf(new ParsedType.Const(String.class)), result);
+    assertThat(result).isEqualTo(new ParsedType.ArrayOf(new ParsedType.Const(String.class)));
   }
 
   @Test
@@ -41,7 +41,7 @@ final class ParsedTypeTest {
 
     ParsedType expected =
         new ParsedType.App(new ParsedType.Const(List.class), new ParsedType.Const(String.class));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -53,7 +53,7 @@ final class ParsedTypeTest {
         new ParsedType.App(
             new ParsedType.App(new ParsedType.Const(Map.class), new ParsedType.Const(String.class)),
             new ParsedType.Const(Integer.class));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -66,7 +66,7 @@ final class ParsedTypeTest {
             new ParsedType.Const(List.class),
             new ParsedType.App(
                 new ParsedType.Const(Optional.class), new ParsedType.Const(String.class)));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -79,6 +79,6 @@ final class ParsedTypeTest {
             new ParsedType.Const(String.class),
             new ParsedType.Const(Integer.class),
             new ParsedType.Primitive(int.class));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 }

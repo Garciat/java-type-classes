@@ -1,6 +1,6 @@
 package com.garciat.typeclasses.impl;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import com.garciat.typeclasses.types.Maybe;
 import java.lang.reflect.TypeVariable;
@@ -16,7 +16,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertEquals(Maybe.just(Map.of()), result);
+    assertThat(result).isEqualTo(Maybe.just(Map.of()));
   }
 
   @Test
@@ -26,7 +26,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertEquals(Maybe.nothing(), result);
+    assertThat(result).isEqualTo(Maybe.nothing());
   }
 
   @Test
@@ -37,7 +37,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertEquals(Maybe.just(Map.of(t1, t2)), result);
+    assertThat(result).isEqualTo(Maybe.just(Map.of(t1, t2)));
   }
 
   @Test
@@ -48,7 +48,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(t1, t2);
 
-    assertEquals(Maybe.nothing(), result);
+    assertThat(result).isEqualTo(Maybe.nothing());
   }
 
   @Test
@@ -60,7 +60,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(list1, list2);
 
-    assertEquals(Maybe.just(Map.of()), result);
+    assertThat(result).isEqualTo(Maybe.just(Map.of()));
   }
 
   @Test
@@ -72,7 +72,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(list1, list2);
 
-    assertEquals(Maybe.nothing(), result);
+    assertThat(result).isEqualTo(Maybe.nothing());
   }
 
   @Test
@@ -82,7 +82,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(arr1, arr2);
 
-    assertEquals(Maybe.just(Map.of()), result);
+    assertThat(result).isEqualTo(Maybe.just(Map.of()));
   }
 
   @Test
@@ -92,7 +92,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(p1, p2);
 
-    assertEquals(Maybe.just(Map.of()), result);
+    assertThat(result).isEqualTo(Maybe.just(Map.of()));
   }
 
   @Test
@@ -102,7 +102,7 @@ final class UnificationTest {
 
     Maybe<Map<ParsedType.Var, ParsedType>> result = Unification.unify(p1, p2);
 
-    assertEquals(Maybe.nothing(), result);
+    assertThat(result).isEqualTo(Maybe.nothing());
   }
 
   @Test
@@ -114,7 +114,7 @@ final class UnificationTest {
 
     ParsedType result = Unification.substitute(map, var);
 
-    assertEquals(replacement, result);
+    assertThat(result).isEqualTo(replacement);
   }
 
   @Test
@@ -124,7 +124,7 @@ final class UnificationTest {
 
     ParsedType result = Unification.substitute(map, type);
 
-    assertEquals(type, result);
+    assertThat(result).isEqualTo(type);
   }
 
   @Test
@@ -138,7 +138,7 @@ final class UnificationTest {
     ParsedType result = Unification.substitute(map, app);
 
     ParsedType expected = new ParsedType.App(new ParsedType.Const(List.class), replacement);
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -152,7 +152,7 @@ final class UnificationTest {
     ParsedType result = Unification.substitute(map, arrayType);
 
     ParsedType expected = new ParsedType.ArrayOf(replacement);
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -174,7 +174,7 @@ final class UnificationTest {
             replacement,
             new ParsedType.Const(Integer.class),
             new ParsedType.App(new ParsedType.Const(List.class), replacement));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   // Helper to get a type variable for testing

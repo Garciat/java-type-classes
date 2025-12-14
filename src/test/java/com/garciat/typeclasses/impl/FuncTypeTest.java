@@ -1,6 +1,6 @@
 package com.garciat.typeclasses.impl;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.*;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -13,7 +13,7 @@ final class FuncTypeTest {
     FuncType result = FuncType.parse(method);
 
     FuncType expected = new FuncType(method, List.of(), new ParsedType.Const(String.class));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -26,7 +26,7 @@ final class FuncTypeTest {
             method,
             List.of(new ParsedType.Const(Integer.class), new ParsedType.Const(String.class)),
             new ParsedType.Const(Boolean.class));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -40,7 +40,7 @@ final class FuncTypeTest {
             List.of(),
             new ParsedType.App(
                 new ParsedType.Const(List.class), new ParsedType.Const(String.class)));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -55,7 +55,7 @@ final class FuncTypeTest {
                 new ParsedType.App(
                     new ParsedType.Const(List.class), new ParsedType.Const(Integer.class))),
             new ParsedType.Primitive(void.class));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
@@ -68,13 +68,13 @@ final class FuncTypeTest {
             method,
             List.of(new ParsedType.Primitive(int.class), new ParsedType.Primitive(boolean.class)),
             new ParsedType.Primitive(void.class));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test
   void parseNonStaticMethodThrows() throws Exception {
     Method method = TestMethods.class.getDeclaredMethod("nonStatic");
-    assertThrows(IllegalArgumentException.class, () -> FuncType.parse(method));
+    assertThatThrownBy(() -> FuncType.parse(method)).isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -88,7 +88,7 @@ final class FuncTypeTest {
             method,
             List.of(new ParsedType.Var(method.getTypeParameters()[0])),
             new ParsedType.Var(method.getTypeParameters()[0]));
-    assertEquals(expected, result);
+    assertThat(result).isEqualTo(expected);
   }
 
   // Test helper class with various method signatures
