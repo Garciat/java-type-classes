@@ -73,12 +73,12 @@ public final class WitnessResolutionProcessor implements Plugin {
           // Get the type argument from the Ty<T> parameter
           if (!node.getArguments().isEmpty()) {
             var firstArg = node.getArguments().get(0);
-            
+
             // Check if it's a "new Ty<>() {}" anonymous class creation
             if (firstArg instanceof NewClassTree newClass) {
               var path = trees.getPath(getCurrentPath().getCompilationUnit(), newClass);
               TypeMirror typeMirror = trees.getTypeMirror(path);
-              
+
               // Try to extract witness type and verify resolution
               verifyWitnessFromTypeMirror(typeMirror, newClass);
             }
@@ -96,10 +96,11 @@ public final class WitnessResolutionProcessor implements Plugin {
           var typeArgs = declaredType.getTypeArguments();
           if (!typeArgs.isEmpty()) {
             TypeMirror witnessTypeMirror = typeArgs.get(0);
-            
+
             // Convert TypeMirror to reflection Type
-            java.lang.reflect.@Nullable Type reflectType = convertToReflectionType(witnessTypeMirror);
-            
+            java.lang.reflect.@Nullable Type reflectType =
+                convertToReflectionType(witnessTypeMirror);
+
             if (reflectType != null) {
               verifyWitnessResolution(reflectType, node);
             }
@@ -117,9 +118,13 @@ public final class WitnessResolutionProcessor implements Plugin {
         Either<WitnessResolution.ResolutionError, WitnessResolution.InstantiationPlan> result =
             WitnessResolution.resolve(parsed, List.of());
 
-        if (result instanceof Either.Left<WitnessResolution.ResolutionError, WitnessResolution.InstantiationPlan>(var error)) {
+        if (result
+            instanceof
+            Either.Left<WitnessResolution.ResolutionError, WitnessResolution.InstantiationPlan>(
+                var error)) {
           String message = "Witness resolution will fail at runtime:\n" + error.format();
-          trees.printMessage(Diagnostic.Kind.ERROR, message, node, getCurrentPath().getCompilationUnit());
+          trees.printMessage(
+              Diagnostic.Kind.ERROR, message, node, getCurrentPath().getCompilationUnit());
         }
         // If Right, witness resolution will succeed - no error
       } catch (Exception ex) {
@@ -132,15 +137,16 @@ public final class WitnessResolutionProcessor implements Plugin {
       try {
         // Get the string representation and try to load the class
         String typeName = typeMirror.toString();
-        
+
         // Handle parameterized types by extracting the raw type
         int genericStart = typeName.indexOf('<');
         if (genericStart != -1) {
           // For now, we'll try to construct a ParameterizedType
-          // This is a simplified approach - a full implementation would need more sophisticated handling
+          // This is a simplified approach - a full implementation would need more sophisticated
+          // handling
           String rawTypeName = typeName.substring(0, genericStart);
           Class<?> rawType = loadClass(rawTypeName);
-          
+
           // For simple cases, return the raw type
           // A complete implementation would need to construct proper ParameterizedType instances
           return rawType;
