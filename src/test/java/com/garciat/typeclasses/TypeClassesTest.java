@@ -4,7 +4,6 @@ import static com.garciat.typeclasses.TypeClasses.witness;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.garciat.typeclasses.api.Ctx;
 import com.garciat.typeclasses.api.Ty;
 import com.garciat.typeclasses.testclasses.TestEq;
 import com.garciat.typeclasses.testclasses.TestShow;
@@ -157,18 +156,6 @@ final class TypeClassesTest {
   // ============================================
 
   @Test
-  void witnessSummoningWithContext() {
-    // Provide a custom witness via context
-    TestShow<CustomType> customShow = c -> "custom:" + c.value;
-
-    TestShow<List<CustomType>> listShow = witness(new Ty<>() {}, new Ctx<>(customShow) {});
-
-    assertThat(listShow).isNotNull();
-    assertThat(listShow.show(List.of(new CustomType("a"), new CustomType("b"))))
-        .isEqualTo("[custom:a,custom:b]");
-  }
-
-  @Test
   void witnessSummoningBuildsTree() {
     // Verify that the witness is actually constructed correctly
     // by checking its behavior with nested types
@@ -216,12 +203,12 @@ final class TypeClassesTest {
   // Test helper classes
   // ============================================
 
-  @SuppressWarnings("NullAway")
+  @SuppressWarnings({"NullAway", "unused"})
   static class NoWitnessType {
     String value;
   }
 
-  @SuppressWarnings("NullAway")
+  @SuppressWarnings({"NullAway", "unused"})
   static class CustomType {
     String value;
 

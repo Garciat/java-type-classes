@@ -1,22 +1,19 @@
 package com.garciat.typeclasses.impl;
 
-import com.garciat.typeclasses.impl.WitnessRule.ContextInstance;
 import com.garciat.typeclasses.types.Either;
-import java.util.List;
+import java.lang.reflect.Type;
 
 public final class WitnessSummoning {
   private WitnessSummoning() {}
 
-  public static Either<SummonError, Object> summon(
-      ParsedType target, List<ContextInstance> context) {
-    return WitnessResolution.resolve(target, context)
+  public static Either<SummonError, Object> summon(Type target) {
+    RuntimeWitnessSystem system = new RuntimeWitnessSystem();
+
+    return WitnessResolution.resolve(system, system.parse(target))
         .<SummonError>mapLeft(SummonError.Resolution::new)
         .map(WitnessInstantiation::compile)
         .flatMap(
-            expr ->
-                WitnessInstantiation.interpret(
-                        WitnessInstantiation.InterpretContext.of(context), expr)
-                    .mapLeft(SummonError.Instantiation::new));
+            expr -> WitnessInstantiation.interpret(expr).mapLeft(SummonError.Instantiation::new));
   }
 
   public sealed interface SummonError {

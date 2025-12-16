@@ -2,23 +2,9 @@ package com.garciat.typeclasses;
 
 import static com.garciat.typeclasses.TypeClasses.witness;
 
-import com.garciat.typeclasses.api.Ctx;
 import com.garciat.typeclasses.api.Ty;
-import com.garciat.typeclasses.classes.Arbitrary;
-import com.garciat.typeclasses.classes.Eq;
-import com.garciat.typeclasses.classes.Foldable;
-import com.garciat.typeclasses.classes.Monoid;
-import com.garciat.typeclasses.classes.Ord;
-import com.garciat.typeclasses.classes.PrintAll;
-import com.garciat.typeclasses.classes.Show;
-import com.garciat.typeclasses.classes.SumAllInt;
-import com.garciat.typeclasses.classes.Traversable;
-import com.garciat.typeclasses.types.F3;
-import com.garciat.typeclasses.types.FwdList;
-import com.garciat.typeclasses.types.JavaList;
-import com.garciat.typeclasses.types.Maybe;
-import com.garciat.typeclasses.types.Sum;
-import com.garciat.typeclasses.types.Unit;
+import com.garciat.typeclasses.classes.*;
+import com.garciat.typeclasses.types.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -66,8 +52,6 @@ final class ExamplesTest {
 
     System.out.println(Show.show(witness(new Ty<>() {}), FwdList.of('h', 'e', 'l', 'l', 'o')));
 
-    example(witness(new Ty<>() {}), 123);
-
     F3<Integer, Integer, Integer, Integer> sum = SumAllInt.of(witness(new Ty<>() {}));
     System.out.println(sum.apply(1, 2, 3));
 
@@ -79,9 +63,5 @@ final class ExamplesTest {
     System.out.println(foldableFwdList.length(FwdList.of(1, 2, 3, 4, 5)));
 
     System.out.println(foldableFwdList.toList(FwdList.of(1, 2, 3)));
-  }
-
-  private static <A> void example(Show<A> showA, A value) {
-    System.out.println(Show.show(witness(new Ty<>() {}, new Ctx<>(showA) {}), JavaList.of(value)));
   }
 }

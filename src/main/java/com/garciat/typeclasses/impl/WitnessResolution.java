@@ -1,37 +1,25 @@
 package com.garciat.typeclasses.impl;
 
-import com.garciat.typeclasses.impl.WitnessRule.ContextInstance;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
 import com.garciat.typeclasses.types.Either;
+import com.garciat.typeclasses.types.Maybe;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public final class WitnessResolution {
   private WitnessResolution() {}
 
-  /** Resolves a ParsedType into an InstantiationPlan. */
   public static Either<ResolutionError, InstantiationPlan> resolve(
-      ParsedType target, List<ContextInstance> context) {
-    record Match(WitnessRule rule, List<ParsedType> requirements) {}
-
+      RuntimeWitnessSystem system, ParsedType target) {
     List<Match> matches =
-        Stream.<WitnessRule>concat(
-                context.stream(),
-                OverlappingInstances.reduce(ConstructorLookup.findRules(target)).stream())
-            .flatMap(
-                rule ->
-                    rule
-                        .tryMatch(target)
-                        .map(requirements -> new Match(rule, requirements))
-                        .stream())
+        OverlappingInstances.reduce(system.findRules(target)).stream()
+            .flatMap(rule -> tryMatch(rule, target).stream())
             .toList();
 
     return switch (ZeroOneMore.of(matches)) {
       case ZeroOneMore.One<Match>(Match(var rule, var requirements)) ->
-          Either.traverse(requirements, req -> resolve(req, context))
-              .<InstantiationPlan>map(
-                  dependencies -> new InstantiationPlan.PlanStep(rule, dependencies))
+          Either.traverse(requirements, r -> resolve(system, r))
+              .<InstantiationPlan>map(dependencies -> new InstantiationPlan(rule, dependencies))
               .mapLeft(error -> new ResolutionError.Nested(target, error));
       case ZeroOneMore.Zero<Match>() -> Either.left(new ResolutionError.NotFound(target));
       case ZeroOneMore.More<Match>(var matches2) ->
@@ -40,31 +28,34 @@ public final class WitnessResolution {
     };
   }
 
-  /**
-   * Represents the fully resolved instantiation plan. This is a tree structure where each node is a
-   * step in the instantiation process, with dependencies on other steps.
-   */
-  public sealed interface InstantiationPlan {
-    record PlanStep(WitnessRule target, List<InstantiationPlan> dependencies)
-        implements InstantiationPlan {}
+  private static Maybe<Match> tryMatch(WitnessConstructor rule, ParsedType target) {
+    return Unification.unify(rule.returnType(), target)
+        .map(map -> Unification.substituteAll(map, rule.paramTypes()))
+        .map(requirements -> new Match(rule, requirements));
   }
+
+  private record Match(WitnessConstructor rule, List<ParsedType> requirements) {}
+
+  public record InstantiationPlan(
+      WitnessConstructor target, List<InstantiationPlan> dependencies) {}
 
   public sealed interface ResolutionError {
     record NotFound(ParsedType target) implements ResolutionError {}
 
-    record Ambiguous(ParsedType target, List<WitnessRule> candidates) implements ResolutionError {}
+    record Ambiguous(ParsedType target, List<WitnessConstructor> candidates)
+        implements ResolutionError {}
 
     record Nested(ParsedType target, ResolutionError cause) implements ResolutionError {}
 
     default String format() {
       return switch (this) {
         case NotFound(ParsedType target) -> "No witness found for type: " + target.format();
-        case Ambiguous(ParsedType target, List<WitnessRule> candidates) ->
+        case Ambiguous(ParsedType target, List<WitnessConstructor> candidates) ->
             "Ambiguous witnesses found for type: "
                 + target.format()
                 + "\nCandidates:\n"
                 + candidates.stream()
-                    .map(WitnessRule::toString)
+                    .map(WitnessConstructor::format)
                     .collect(Collectors.joining("\n"))
                     .indent(2);
         case Nested(ParsedType target, ResolutionError cause) ->
