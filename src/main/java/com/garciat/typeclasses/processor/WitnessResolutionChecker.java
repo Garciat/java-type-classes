@@ -11,7 +11,6 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
 public final class WitnessResolutionChecker implements Plugin {
@@ -44,29 +43,23 @@ public final class WitnessResolutionChecker implements Plugin {
               return;
             }
 
-            Trees trees = Trees.instance(task);
-            new WitnessCallScanner(trees, task.getTypes()).scan(e.getCompilationUnit(), trees);
+            new WitnessCallScanner(Trees.instance(task)).scan(e.getCompilationUnit(), null);
           }
         });
   }
 
   /** Scanner that finds calls to TypeClasses.witness() and validates them. */
-  private static class WitnessCallScanner extends TreePathScanner<Void, Trees> {
+  private static class WitnessCallScanner extends TreePathScanner<Void, Void> {
     private final Trees trees;
     private final StaticWitnessSystem system;
 
-    WitnessCallScanner(Trees trees, Types types) {
+    private WitnessCallScanner(Trees trees) {
       this.trees = trees;
-      this.system = new StaticWitnessSystem(types);
+      this.system = new StaticWitnessSystem();
     }
 
     @Override
-    public Void visitClass(ClassTree node, Trees trees) {
-      return super.visitClass(node, trees);
-    }
-
-    @Override
-    public Void visitMethodInvocation(MethodInvocationTree node, Trees trees) {
+    public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
       Element element = trees.getElement(getCurrentPath());
 
       if (isMethodCall(WITNESS_METHOD, element)) {
@@ -94,7 +87,7 @@ public final class WitnessResolutionChecker implements Plugin {
                   this.trees.printMessage(
                       Diagnostic.Kind.ERROR,
                       "Failed to resolve witness for type: "
-                          + target.format()
+                          + witnessTypeMirror
                           + "\nReason: "
                           + error.format(),
                       getCurrentPath().getLeaf(),
@@ -107,7 +100,7 @@ public final class WitnessResolutionChecker implements Plugin {
         }
       }
 
-      return super.visitMethodInvocation(node, trees);
+      return super.visitMethodInvocation(node, arg);
     }
   }
 

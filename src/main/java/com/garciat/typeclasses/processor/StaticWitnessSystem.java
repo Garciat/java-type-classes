@@ -15,18 +15,13 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.*;
-import javax.lang.model.util.Types;
 
 public class StaticWitnessSystem {
   private static final Class<?> TAG_BASE_CLASS = TagBase.class;
   private static final Class<?> TAPP_CLASS = TApp.class;
   private static final Class<?> TPAR_CLASS = TPar.class;
 
-  private final Types types;
-
-  public StaticWitnessSystem(Types types) {
-    this.types = types;
-  }
+  public StaticWitnessSystem() {}
 
   public List<WitnessConstructor> findRules(ParsedType target) {
     return switch (target) {
@@ -42,7 +37,7 @@ public class StaticWitnessSystem {
     };
   }
 
-  public Maybe<WitnessConstructor> parseWitnessConstructor(ExecutableElement method) {
+  private Maybe<WitnessConstructor> parseWitnessConstructor(ExecutableElement method) {
     if (method.getModifiers().contains(Modifier.PUBLIC)
         && method.getModifiers().contains(Modifier.STATIC)
         && method.getAnnotation(TypeClass.Witness.class) instanceof TypeClass.Witness witnessAnn) {
@@ -59,10 +54,6 @@ public class StaticWitnessSystem {
     } else {
       return Maybe.nothing();
     }
-  }
-
-  public List<ParsedType> parseAll(List<? extends TypeMirror> types) {
-    return types.stream().map(this::parse).toList();
   }
 
   public ParsedType parse(TypeMirror type) {
@@ -82,8 +73,9 @@ public class StaticWitnessSystem {
                   Pair<TypeMirror, TypeMirror>(var fun, var arg)) ->
           new ParsedType.App(parse(fun), parse(arg));
       case DeclaredType dt ->
-          parseAll(dt.getTypeArguments()).stream()
-              .reduce(parse(types.erasure(dt)), ParsedType.App::new);
+          dt.getTypeArguments().stream()
+              .map(this::parse)
+              .reduce(new ParsedType.Const(erasure(dt)), ParsedType.App::new);
       case WildcardType wt ->
           throw new IllegalArgumentException("Cannot parse wildcard type: " + wt);
       default -> throw new IllegalArgumentException("Unsupported type: " + type);
@@ -104,7 +96,7 @@ public class StaticWitnessSystem {
   }
 
   private Maybe<Pair<TypeMirror, TypeMirror>> parseAppType(DeclaredType t) {
-    return t.getTypeArguments().size() == 2 && isAppType(types.erasure(t))
+    return t.getTypeArguments().size() == 2 && isAppType(erasure(t))
         ? Maybe.just(new Pair<>(t.getTypeArguments().get(0), t.getTypeArguments().get(1)))
         : Maybe.nothing();
   }
@@ -114,6 +106,10 @@ public class StaticWitnessSystem {
         && dt.asElement() instanceof TypeElement te
         && (te.getQualifiedName().contentEquals(TAPP_CLASS.getName())
             || te.getQualifiedName().contentEquals(TPAR_CLASS.getName()));
+  }
+
+  private DeclaredType erasure(DeclaredType t) {
+    return t.asElement().asType() instanceof DeclaredType typeCtor ? typeCtor : t;
   }
 
   private static <T extends U, U> Function<U, Stream<T>> isInstanceOf(Class<T> cls) {
