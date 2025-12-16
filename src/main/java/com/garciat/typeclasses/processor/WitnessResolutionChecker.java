@@ -53,12 +53,10 @@ public final class WitnessResolutionChecker implements Plugin {
   /** Scanner that finds calls to TypeClasses.witness() and validates them. */
   private static class WitnessCallScanner extends TreePathScanner<Void, Trees> {
     private final Trees trees;
-    private final Types types;
     private final StaticWitnessSystem system;
 
     WitnessCallScanner(Trees trees, Types types) {
       this.trees = trees;
-      this.types = types;
       this.system = new StaticWitnessSystem(types);
     }
 
@@ -74,18 +72,18 @@ public final class WitnessResolutionChecker implements Plugin {
       if (isMethodCall(WITNESS_METHOD, element)) {
         // Found a call to TypeClasses.witness()
         // The first argument is expected to be of the form "new Ty<>() {}"
-        ExpressionTree firstArg = node.getArguments().get(0);
+        ExpressionTree firstArg = node.getArguments().getFirst();
 
         // Check if it's a "new Ty<>() {}" anonymous class creation
         if (firstArg instanceof NewClassTree newClass) {
-          Tree tyApp = newClass.getClassBody().getImplementsClause().get(0);
+          Tree tyApp = newClass.getClassBody().getImplementsClause().getFirst();
 
           TypeMirror typeMirror =
               trees.getTypeMirror(trees.getPath(getCurrentPath().getCompilationUnit(), tyApp));
 
           // Try to extract witness type and verify resolution
           if (typeMirror instanceof DeclaredType declaredType) {
-            TypeMirror witnessTypeMirror = declaredType.getTypeArguments().get(0);
+            TypeMirror witnessTypeMirror = declaredType.getTypeArguments().getFirst();
 
             ParsedType target = system.parse(witnessTypeMirror);
 
@@ -103,7 +101,7 @@ public final class WitnessResolutionChecker implements Plugin {
                       getCurrentPath().getCompilationUnit());
               case Either.Right<
                           WitnessResolution.ResolutionError, WitnessResolution.InstantiationPlan>
-                      v -> {}
+                      ignore -> {}
             }
           }
         }
