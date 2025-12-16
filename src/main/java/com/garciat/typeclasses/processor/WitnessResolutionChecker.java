@@ -110,7 +110,7 @@ interface Parser<T, R> {
         this.parse(trees, current, input).flatMap(r -> next.parse(trees, current, r));
   }
 
-  static <T> Parser<MethodInvocationTree, ExpressionTree> unaryMethodCallArgument(Method target) {
+  static Parser<MethodInvocationTree, ExpressionTree> unaryMethodCallArgument(Method target) {
     return (trees, current, input) -> {
       if (trees.getElement(current) instanceof ExecutableElement method
           && method.getSimpleName().contentEquals(target.getName())
