@@ -19,6 +19,7 @@ import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
 import java.lang.reflect.Method;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
@@ -72,7 +73,11 @@ public final class WitnessResolutionChecker implements Plugin {
 
     @Override
     public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
-      Parser.unaryMethodCallArgument(WITNESS_METHOD)
+      Parser.unaryCallArgument()
+          .guard(
+              Parser.<MethodInvocationTree>currentElement()
+                  .flatMap(Parser.executableElement())
+                  .flatMap(Parser.methodMatches(WITNESS_METHOD)))
           .flatMap(Parser.newAnonymousClassBody())
           .flatMap(Parser.singleImplementsClause())
           .flatMap(Parser.treeTypeMirror())
@@ -110,13 +115,47 @@ interface Parser<T, R> {
         this.parse(trees, current, input).flatMap(r -> next.parse(trees, current, r));
   }
 
-  static Parser<MethodInvocationTree, ExpressionTree> unaryMethodCallArgument(Method target) {
+  default Parser<T, R> guard(Parser<T, ?> predicate) {
+    return (trees, current, input) ->
+        predicate.parse(trees, current, input).flatMap(ignore -> this.parse(trees, current, input));
+  }
+
+  static <A> Parser<A, Element> currentElement() {
     return (trees, current, input) -> {
-      if (trees.getElement(current) instanceof ExecutableElement method
-          && method.getSimpleName().contentEquals(target.getName())
-          && method.getEnclosingElement() instanceof TypeElement methodOwner
-          && methodOwner.getQualifiedName().contentEquals(target.getDeclaringClass().getName())
-          && input.getArguments().size() == 1) {
+      Element element = trees.getElement(current);
+      if (element != null) {
+        return Maybe.just(element);
+      } else {
+        return Maybe.nothing();
+      }
+    };
+  }
+
+  static Parser<Element, ExecutableElement> executableElement() {
+    return (trees, current, input) -> {
+      if (input instanceof ExecutableElement method) {
+        return Maybe.just(method);
+      } else {
+        return Maybe.nothing();
+      }
+    };
+  }
+
+  static Parser<ExecutableElement, ExecutableElement> methodMatches(Method target) {
+    return (trees, current, input) -> {
+      if (input.getSimpleName().contentEquals(target.getName())
+          && input.getEnclosingElement() instanceof TypeElement methodOwner
+          && methodOwner.getQualifiedName().contentEquals(target.getDeclaringClass().getName())) {
+        return Maybe.just(input);
+      } else {
+        return Maybe.nothing();
+      }
+    };
+  }
+
+  static Parser<MethodInvocationTree, ExpressionTree> unaryCallArgument() {
+    return (trees, current, input) -> {
+      if (input.getArguments().size() == 1) {
         return Maybe.just(input.getArguments().getFirst());
       } else {
         return Maybe.nothing();
