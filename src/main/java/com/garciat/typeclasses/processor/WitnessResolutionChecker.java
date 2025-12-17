@@ -19,6 +19,10 @@ import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
 import java.lang.reflect.Method;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -73,11 +77,11 @@ public final class WitnessResolutionChecker implements Plugin {
 
     @Override
     public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
-      Parser.unaryCallArgument()
+      Parser.<MethodInvocationTree>identity()
           .guard(
               Parser.<MethodInvocationTree>currentElement()
-                  .flatMap(Parser.executableElement())
                   .flatMap(Parser.methodMatches(WITNESS_METHOD)))
+          .flatMap(Parser.unaryCallArgument())
           .flatMap(Parser.newAnonymousClassBody())
           .flatMap(Parser.singleImplementsClause())
           .flatMap(Parser.treeTypeMirror())
@@ -115,9 +119,50 @@ interface Parser<T, R> {
         this.parse(trees, current, input).flatMap(r -> next.parse(trees, current, r));
   }
 
-  default Parser<T, R> guard(Parser<T, ?> predicate) {
+  default <S> Parser<T, S> map(Function<R, S> mapper) {
+    return flatMap(mapping(mapper));
+  }
+
+  default Parser<T, R> filter(Predicate<R> predicate) {
+    return flatMap(filtering(predicate));
+  }
+
+  default Parser<T, R> guard(Parser<R, ?> predicate) {
     return (trees, current, input) ->
-        predicate.parse(trees, current, input).flatMap(ignore -> this.parse(trees, current, input));
+        this.parse(trees, current, input)
+            .flatMap(r -> predicate.parse(trees, current, r).map(x -> r));
+  }
+
+  static <T> Parser<T, T> identity() {
+    return (trees, current, input) -> Maybe.just(input);
+  }
+
+  static <T, R> Parser<T, R> mapping(Function<T, R> mapper) {
+    return (trees, current, input) -> Maybe.just(mapper.apply(input));
+  }
+
+  static <T> Parser<T, T> filtering(Predicate<T> predicate) {
+    return (trees, current, input) -> {
+      if (predicate.test(input)) {
+        return Maybe.just(input);
+      } else {
+        return Maybe.nothing();
+      }
+    };
+  }
+
+  static <T> Parser<T, T> notNull() {
+    return filtering(Objects::nonNull);
+  }
+
+  static <T, R extends T> Parser<T, R> as(Class<R> cls) {
+    return (trees, current, input) -> {
+      if (cls.isInstance(input)) {
+        return Maybe.just(cls.cast(input));
+      } else {
+        return Maybe.nothing();
+      }
+    };
   }
 
   static <A> Parser<A, Element> currentElement() {
@@ -131,56 +176,33 @@ interface Parser<T, R> {
     };
   }
 
-  static Parser<Element, ExecutableElement> executableElement() {
-    return (trees, current, input) -> {
-      if (input instanceof ExecutableElement method) {
-        return Maybe.just(method);
-      } else {
-        return Maybe.nothing();
-      }
-    };
-  }
-
-  static Parser<ExecutableElement, ExecutableElement> methodMatches(Method target) {
-    return (trees, current, input) -> {
-      if (input.getSimpleName().contentEquals(target.getName())
-          && input.getEnclosingElement() instanceof TypeElement methodOwner
-          && methodOwner.getQualifiedName().contentEquals(target.getDeclaringClass().getName())) {
-        return Maybe.just(input);
-      } else {
-        return Maybe.nothing();
-      }
-    };
+  static Parser<Element, ExecutableElement> methodMatches(Method target) {
+    return Parser.<Element, ExecutableElement>as(ExecutableElement.class)
+        .filter(m -> m.getSimpleName().contentEquals(target.getName()))
+        .guard(
+            mapping(ExecutableElement::getEnclosingElement)
+                .flatMap(as(TypeElement.class))
+                .map(TypeElement::getQualifiedName)
+                .filter(name -> name.contentEquals(target.getDeclaringClass().getName())));
   }
 
   static Parser<MethodInvocationTree, ExpressionTree> unaryCallArgument() {
-    return (trees, current, input) -> {
-      if (input.getArguments().size() == 1) {
-        return Maybe.just(input.getArguments().getFirst());
-      } else {
-        return Maybe.nothing();
-      }
-    };
+    return mapping(MethodInvocationTree::getArguments)
+        .filter(list -> list.size() == 1)
+        .map(List::getFirst);
   }
 
   static Parser<ExpressionTree, ClassTree> newAnonymousClassBody() {
-    return (trees, current, input) -> {
-      if (input instanceof NewClassTree newClass && newClass.getClassBody() != null) {
-        return Maybe.just(newClass.getClassBody());
-      } else {
-        return Maybe.nothing();
-      }
-    };
+    return Parser.<ExpressionTree, NewClassTree>as(NewClassTree.class)
+        .map(NewClassTree::getClassBody)
+        .flatMap(notNull());
   }
 
   static Parser<ClassTree, Tree> singleImplementsClause() {
-    return (trees, current, input) -> {
-      if (input.getImplementsClause() != null && input.getImplementsClause().size() == 1) {
-        return Maybe.just(input.getImplementsClause().getFirst());
-      } else {
-        return Maybe.nothing();
-      }
-    };
+    return mapping(ClassTree::getImplementsClause)
+        .flatMap(notNull())
+        .filter(list -> list.size() == 1)
+        .map(List::getFirst);
   }
 
   static Parser<Tree, TypeMirror> treeTypeMirror() {
@@ -196,23 +218,21 @@ interface Parser<T, R> {
   }
 
   static Parser<TypeMirror, DeclaredType> rawTypeMatches(Class<?> cls) {
-    return (trees, current, input) -> {
-      if (input instanceof DeclaredType declaredType
-          && declaredType.asElement() instanceof TypeElement typeElement
-          && typeElement.getQualifiedName().contentEquals(cls.getName())) {
-        return Maybe.just(declaredType);
-      }
-      return Maybe.nothing();
-    };
+    return Parser.<TypeMirror, DeclaredType>as(DeclaredType.class)
+        .guard(
+            declaredTypeElement()
+                .flatMap(as(TypeElement.class))
+                .map(TypeElement::getQualifiedName)
+                .filter(name -> name.contentEquals(cls.getName())));
   }
 
   static Parser<DeclaredType, TypeMirror> unaryTypeArgument() {
-    return (trees, current, input) -> {
-      if (input.getTypeArguments().size() == 1) {
-        return Maybe.just(input.getTypeArguments().getFirst());
-      } else {
-        return Maybe.nothing();
-      }
-    };
+    return mapping(DeclaredType::getTypeArguments)
+        .filter(list -> list.size() == 1)
+        .map(List::getFirst);
+  }
+
+  static Parser<DeclaredType, Element> declaredTypeElement() {
+    return mapping(DeclaredType::asElement).flatMap(notNull());
   }
 }
