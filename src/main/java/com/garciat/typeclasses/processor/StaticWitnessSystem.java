@@ -27,7 +27,7 @@ public class StaticWitnessSystem {
     return switch (target) {
       case ParsedType.App(var fun, var arg) -> Lists.concat(findRules(fun), findRules(arg));
       case ParsedType.Const(var java) ->
-          java.asElement().getEnclosedElements().stream()
+          java.getEnclosedElements().stream()
               .flatMap(isInstanceOf(ExecutableElement.class))
               .flatMap(method -> parseWitnessConstructor(method).stream())
               .toList();
@@ -62,10 +62,11 @@ public class StaticWitnessSystem {
       case ArrayType at -> new ParsedType.ArrayOf(parse(at.getComponentType()));
       // Store primitive as its boxed type representation, just to have a DeclaredType.
       case PrimitiveType pt -> new ParsedType.Primitive(pt);
-      case DeclaredType dt
-          when parseTagType(dt) instanceof Maybe.Just<DeclaredType>(var realType) ->
+      case DeclaredType dt when parseTagType(dt) instanceof Maybe.Just<TypeElement>(var realType) ->
           new ParsedType.Const(realType);
-      case DeclaredType dt when dt.getTypeArguments().isEmpty() -> new ParsedType.Const(dt);
+      case DeclaredType dt
+          when dt.getTypeArguments().isEmpty() && dt.asElement() instanceof TypeElement ty ->
+          new ParsedType.Const(ty);
       case DeclaredType dt
           when parseAppType(dt)
               instanceof
@@ -82,14 +83,13 @@ public class StaticWitnessSystem {
     };
   }
 
-  private static Maybe<DeclaredType> parseTagType(DeclaredType t) {
+  private static Maybe<TypeElement> parseTagType(DeclaredType t) {
     if (t.asElement() instanceof TypeElement tag
         && tag.getEnclosingElement() instanceof TypeElement enclosing
-        && enclosing.asType() instanceof DeclaredType enclosingType
         && tag.getSuperclass() instanceof DeclaredType tagSuperType
         && tagSuperType.asElement() instanceof TypeElement tagSuper
         && tagSuper.getQualifiedName().contentEquals(TAG_BASE_CLASS.getName())) {
-      return Maybe.just(enclosingType);
+      return Maybe.just(enclosing);
     } else {
       return Maybe.nothing();
     }
@@ -101,15 +101,17 @@ public class StaticWitnessSystem {
         : Maybe.nothing();
   }
 
-  private boolean isAppType(TypeMirror erasure) {
-    return erasure instanceof DeclaredType dt
-        && dt.asElement() instanceof TypeElement te
-        && (te.getQualifiedName().contentEquals(TAPP_CLASS.getName())
-            || te.getQualifiedName().contentEquals(TPAR_CLASS.getName()));
+  private boolean isAppType(TypeElement te) {
+    return te.getQualifiedName().contentEquals(TAPP_CLASS.getName())
+        || te.getQualifiedName().contentEquals(TPAR_CLASS.getName());
   }
 
-  private DeclaredType erasure(DeclaredType t) {
-    return t.asElement().asType() instanceof DeclaredType typeCtor ? typeCtor : t;
+  private TypeElement erasure(DeclaredType t) {
+    if (t.asElement() instanceof TypeElement te) {
+      return te;
+    } else {
+      throw new IllegalArgumentException("Cannot get erasure of type: " + t);
+    }
   }
 
   private static <T extends U, U> Function<U, Stream<T>> isInstanceOf(Class<T> cls) {

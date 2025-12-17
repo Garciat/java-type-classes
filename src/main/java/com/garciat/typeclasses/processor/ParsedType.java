@@ -1,8 +1,8 @@
 package com.garciat.typeclasses.processor;
 
-import javax.lang.model.type.DeclaredType;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.PrimitiveType;
-import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 
 public sealed interface ParsedType {
@@ -12,7 +12,7 @@ public sealed interface ParsedType {
 
   record ArrayOf(ParsedType elementType) implements ParsedType {}
 
-  record Const(DeclaredType java) implements ParsedType {}
+  record Const(TypeElement java) implements ParsedType {}
 
   record Primitive(PrimitiveType java) implements ParsedType {}
 
@@ -20,9 +20,9 @@ public sealed interface ParsedType {
     return switch (this) {
       case Var v -> v.java.toString();
       case Const c ->
-          c.java().asElement().getSimpleName()
-              + c.java().getTypeArguments().stream()
-                  .map(TypeMirror::toString)
+          c.java().getSimpleName()
+              + c.java().getTypeParameters().stream()
+                  .map(TypeParameterElement::toString)
                   .reduce((a, b) -> a + ", " + b)
                   .map(s -> "[" + s + "]")
                   .orElse("");

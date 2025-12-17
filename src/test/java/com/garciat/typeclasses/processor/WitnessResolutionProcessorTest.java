@@ -5,11 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
@@ -38,18 +34,6 @@ public class WitnessResolutionProcessorTest {
     var files = new java.util.ArrayList<File>();
     files.add(new File("src/test/java/com/garciat/typeclasses/ExamplesTest.java"));
 
-    Files.walkFileTree(
-        Path.of("src/main/java"),
-        new SimpleFileVisitor<>() {
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-            if (file.toString().endsWith(".java")) {
-              files.add(file.toFile());
-            }
-            return FileVisitResult.CONTINUE;
-          }
-        });
-
     var compilationUnits = fileManager.getJavaFileObjectsFromFiles(files);
 
     var task =
@@ -57,7 +41,10 @@ public class WitnessResolutionProcessorTest {
             null,
             fileManager,
             diagnostics,
-            List.of("-Xplugin:WitnessResolutionChecker"),
+            List.of(
+                "-Xplugin:WitnessResolutionChecker",
+                "-classpath",
+                System.getProperty("java.class.path")),
             null,
             compilationUnits);
 
