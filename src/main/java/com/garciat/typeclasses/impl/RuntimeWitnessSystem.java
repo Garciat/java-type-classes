@@ -4,6 +4,11 @@ import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.api.hkt.TApp;
 import com.garciat.typeclasses.api.hkt.TPar;
 import com.garciat.typeclasses.api.hkt.TagBase;
+import com.garciat.typeclasses.impl.ParsedType.App;
+import com.garciat.typeclasses.impl.ParsedType.ArrayOf;
+import com.garciat.typeclasses.impl.ParsedType.Const;
+import com.garciat.typeclasses.impl.ParsedType.Primitive;
+import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.types.Maybe;
 import com.garciat.typeclasses.types.Pair;
@@ -20,14 +25,14 @@ import java.util.List;
 public class RuntimeWitnessSystem {
   public List<WitnessConstructor> findRules(ParsedType target) {
     return switch (target) {
-      case ParsedType.App(var fun, var arg) -> Lists.concat(findRules(fun), findRules(arg));
-      case ParsedType.Const(var java) ->
+      case App(var fun, var arg) -> Lists.concat(findRules(fun), findRules(arg));
+      case Const(var java) ->
           Arrays.stream(java.getDeclaredMethods())
               .flatMap(m -> parseWitnessConstructor(m).stream())
               .toList();
-      case ParsedType.Var(var java) -> List.of();
-      case ParsedType.ArrayOf(var elem) -> List.of();
-      case ParsedType.Primitive(var java) -> List.of();
+      case Var(var ignore) -> List.of();
+      case ArrayOf(var ignore) -> List.of();
+      case Primitive(var ignore) -> List.of();
     };
   }
 
@@ -49,20 +54,20 @@ public class RuntimeWitnessSystem {
   public ParsedType parse(Type java) {
     return switch (java) {
       case Class<?> tag when parseTagType(tag) instanceof Maybe.Just<Class<?>>(var tagged) ->
-          new ParsedType.Const(tagged);
-      case Class<?> arr when arr.isArray() -> new ParsedType.ArrayOf(parse(arr.getComponentType()));
-      case Class<?> prim when prim.isPrimitive() -> new ParsedType.Primitive(prim);
-      case Class<?> c -> new ParsedType.Const(c);
-      case TypeVariable<?> v -> new ParsedType.Var(v);
+          new Const(tagged);
+      case Class<?> arr when arr.isArray() -> new ArrayOf(parse(arr.getComponentType()));
+      case Class<?> prim when prim.isPrimitive() -> new Primitive(prim);
+      case Class<?> c -> new Const(c);
+      case TypeVariable<?> v -> new Var(v);
       case ParameterizedType p
           when parseAppType(p)
               instanceof Maybe.Just<Pair<Type, Type>>(Pair<Type, Type>(var fun, var arg)) ->
-          new ParsedType.App(parse(fun), parse(arg));
+          new App(parse(fun), parse(arg));
       case ParameterizedType p ->
           Arrays.stream(p.getActualTypeArguments())
               .map(this::parse)
-              .reduce(parse(p.getRawType()), ParsedType.App::new);
-      case GenericArrayType a -> new ParsedType.ArrayOf(parse(a.getGenericComponentType()));
+              .reduce(parse(p.getRawType()), App::new);
+      case GenericArrayType a -> new ArrayOf(parse(a.getGenericComponentType()));
       case WildcardType w -> throw new IllegalArgumentException("Cannot parse wildcard type: " + w);
       default -> throw new IllegalArgumentException("Unsupported type: " + java);
     };

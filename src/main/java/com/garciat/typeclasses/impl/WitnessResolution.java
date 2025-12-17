@@ -17,14 +17,15 @@ public final class WitnessResolution {
             .toList();
 
     return switch (ZeroOneMore.of(matches)) {
-      case ZeroOneMore.One<Match>(Match(var rule, var requirements)) ->
+      case ZeroOneMore.One(Match(var rule, var requirements)) ->
           Either.traverse(requirements, r -> resolve(system, r))
               .<InstantiationPlan>map(dependencies -> new InstantiationPlan(rule, dependencies))
               .mapLeft(error -> new ResolutionError.Nested(target, error));
-      case ZeroOneMore.Zero<Match>() -> Either.left(new ResolutionError.NotFound(target));
-      case ZeroOneMore.More<Match>(var matches2) ->
+      case ZeroOneMore.Zero() -> Either.left(new ResolutionError.NotFound(target));
+      case ZeroOneMore.More(var ambiguousMatches) ->
           Either.left(
-              new ResolutionError.Ambiguous(target, matches2.stream().map(Match::rule).toList()));
+              new ResolutionError.Ambiguous(
+                  target, ambiguousMatches.stream().map(Match::rule).toList()));
     };
   }
 
