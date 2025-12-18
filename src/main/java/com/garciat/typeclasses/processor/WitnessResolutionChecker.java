@@ -89,6 +89,12 @@ public final class WitnessResolutionChecker implements Plugin {
       this.names = Names.instance(context);
     }
 
+    /**
+     * Translates the given compilation unit by applying witness call transformations. Sets the
+     * current compilation unit context and translates all definitions in the compilation unit.
+     *
+     * @param compilationUnit the compilation unit to translate
+     */
     public void translate(JCTree.JCCompilationUnit compilationUnit) {
       this.currentCompilationUnit = compilationUnit;
       compilationUnit.defs = translate(compilationUnit.defs);
@@ -96,50 +102,75 @@ public final class WitnessResolutionChecker implements Plugin {
 
     @Override
     public void visitApply(JCTree.JCMethodInvocation tree) {
-      super.visitApply(tree);
-
-      // Check if this is a call to TypeClasses.witness()
+      // Check if this is a call to TypeClasses.witness() BEFORE calling super
       TreePath path = trees.getPath(currentCompilationUnit, tree);
-      if (path == null) {
-        return;
+
+      if (path != null) {
+        Maybe<TypeMirror> witnessType =
+            Parser.<MethodInvocationTree>identity()
+                .guard(
+                    Parser.<MethodInvocationTree>currentElement()
+                        .flatMap(Parser.methodMatches(WITNESS_METHOD)))
+                .flatMap(Parser.unaryCallArgument())
+                .flatMap(Parser.newAnonymousClassBody())
+                .flatMap(Parser.singleImplementsClause())
+                .flatMap(Parser.treeTypeMirror())
+                .flatMap(Parser.rawTypeMatches(Ty.class))
+                .flatMap(Parser.unaryTypeArgument())
+                .parse(trees, path, tree);
+
+        witnessType.fold(
+            Unit::unit,
+            wt -> {
+              WitnessResolution.resolve(system, system.parse(wt))
+                  .fold(
+                      error -> {
+                        trees.printMessage(
+                            Diagnostic.Kind.ERROR,
+                            "Failed to resolve witness for type: "
+                                + wt
+                                + "\nReason: "
+                                + error.format(),
+                            tree,
+                            currentCompilationUnit);
+                        return unit();
+                      },
+                      plan -> {
+                        // AST REWRITING - Currently disabled for prototype
+                        // To enable AST rewriting, uncomment the following lines:
+                        // The buildInstantiationTree() method below shows how to construct
+                        // the replacement tree from the InstantiationPlan.
+                        //
+                        // However, proper AST transformation requires careful handling:
+                        // 1. Transform during ENTER phase, not ANALYZE
+                        // 2. Properly attribute the new nodes (types, symbols)
+                        // 3. Handle all edge cases for tree replacement
+                        //
+                        // For a production implementation, consider using javac's
+                        // TreeMaker in an earlier phase or investigate annotation
+                        // processing as an alternative approach.
+                        //
+                        // Uncomment to enable (may cause compilation errors):
+                        // try {
+                        //   result = buildInstantiationTree(plan);
+                        //   if (result != null && tree != null) {
+                        //     result.pos = tree.pos;
+                        //   }
+                        // } catch (Exception e) {
+                        //   trees.printMessage(
+                        //       Diagnostic.Kind.WARNING,
+                        //       "Failed to transform witness call: " + e.getMessage(),
+                        //       tree,
+                        //       currentCompilationUnit);
+                        // }
+                        return unit();
+                      });
+              return unit();
+            });
       }
 
-      Maybe<TypeMirror> witnessType =
-          Parser.<MethodInvocationTree>identity()
-              .guard(
-                  Parser.<MethodInvocationTree>currentElement()
-                      .flatMap(Parser.methodMatches(WITNESS_METHOD)))
-              .flatMap(Parser.unaryCallArgument())
-              .flatMap(Parser.newAnonymousClassBody())
-              .flatMap(Parser.singleImplementsClause())
-              .flatMap(Parser.treeTypeMirror())
-              .flatMap(Parser.rawTypeMatches(Ty.class))
-              .flatMap(Parser.unaryTypeArgument())
-              .parse(trees, path, tree);
-
-      witnessType.fold(
-          Unit::unit,
-          wt -> {
-            WitnessResolution.resolve(system, system.parse(wt))
-                .fold(
-                    error -> {
-                      trees.printMessage(
-                          Diagnostic.Kind.ERROR,
-                          "Failed to resolve witness for type: "
-                              + wt
-                              + "\nReason: "
-                              + error.format(),
-                          tree,
-                          currentCompilationUnit);
-                      return unit();
-                    },
-                    plan -> {
-                      // Replace the current tree with the generated code
-                      result = buildInstantiationTree(plan);
-                      return unit();
-                    });
-            return unit();
-          });
+      // Always call super since we're not transforming
+      super.visitApply(tree);
     }
 
     /** Recursively builds a JCTree from an InstantiationPlan. */
