@@ -16,10 +16,7 @@ import com.sun.source.util.Plugin;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.source.util.TreePath;
-import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
-import com.sun.tools.javac.api.JavacTrees;
-import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Context;
@@ -158,8 +155,7 @@ public final class WitnessResolutionChecker implements Plugin {
     /** Recursively builds a JCTree from an InstantiationPlan. */
     private JCTree.JCExpression buildInstantiationTree(WitnessResolution.InstantiationPlan plan) {
       return switch (plan) {
-        case WitnessResolution.InstantiationPlan.PlanStep(
-            var constructor, var dependencies) -> {
+        case WitnessResolution.InstantiationPlan.PlanStep(var constructor, var dependencies) -> {
           // Get the ExecutableElement for the witness constructor
           ExecutableElement method = constructor.method();
 
@@ -180,9 +176,7 @@ public final class WitnessResolutionChecker implements Plugin {
       };
     }
 
-    /**
-     * Builds a JCTree expression that references the given method (e.g., ClassName.methodName).
-     */
+    /** Builds a JCTree expression that references the given method (e.g., ClassName.methodName). */
     private JCTree.JCExpression buildMethodReference(ExecutableElement method) {
       // Get the enclosing class
       Element enclosingElement = method.getEnclosingElement();
