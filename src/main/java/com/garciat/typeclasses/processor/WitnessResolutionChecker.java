@@ -52,20 +52,18 @@ public final class WitnessResolutionChecker implements Plugin {
   @Override
   public void init(JavacTask task, String... args) {
     Context context = ((com.sun.tools.javac.api.BasicJavacTask) task).getContext();
+
     task.addTaskListener(
         new TaskListener() {
           @Override
           public void finished(TaskEvent e) {
-            if (e.getKind() != TaskEvent.Kind.ANALYZE) {
-              return;
+            if (e.getKind() == TaskEvent.Kind.ANALYZE) {
+              // Transform immediately after ANALYZE when type info is available
+              if (e.getCompilationUnit() != null) {
+                new WitnessCallRewriter(Trees.instance(task), context)
+                    .transform((JCTree.JCCompilationUnit) e.getCompilationUnit());
+              }
             }
-
-            if (e.getCompilationUnit() == null) {
-              return;
-            }
-
-            new WitnessCallRewriter(Trees.instance(task), context)
-                .translate((JCTree.JCCompilationUnit) e.getCompilationUnit());
           }
         });
   }
@@ -86,70 +84,56 @@ public final class WitnessResolutionChecker implements Plugin {
       this.names = Names.instance(context);
     }
 
-    /**
-     * Translates the given compilation unit by applying witness call transformations. Sets the
-     * current compilation unit context and translates all definitions in the compilation unit.
-     *
-     * @param compilationUnit the compilation unit to translate
-     */
-    public void translate(JCTree.JCCompilationUnit compilationUnit) {
+    /** Transform the compilation unit by replacing witness() calls. */
+    public void transform(JCTree.JCCompilationUnit compilationUnit) {
       this.currentCompilationUnit = compilationUnit;
+      // First scan to validate witness calls
+      new ValidationScanner().scan(compilationUnit, null);
+      // Then apply transformations
       compilationUnit.defs = translate(compilationUnit.defs);
+    }
+
+    /** Scanner to validate witness calls before transformation. */
+    private class ValidationScanner extends com.sun.source.util.TreePathScanner<Void, Void> {
+      @Override
+      public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
+        Parser.<MethodInvocationTree>identity()
+            .guard(
+                Parser.<MethodInvocationTree>currentElement()
+                    .flatMap(Parser.methodMatches(WITNESS_METHOD)))
+            .flatMap(Parser.unaryCallArgument())
+            .flatMap(Parser.newAnonymousClassBody())
+            .flatMap(Parser.singleImplementsClause())
+            .flatMap(Parser.treeTypeMirror())
+            .flatMap(Parser.rawTypeMatches(Ty.class))
+            .flatMap(Parser.unaryTypeArgument())
+            .parse(trees, getCurrentPath(), node)
+            .fold(
+                Unit::unit,
+                witnessType ->
+                    WitnessResolution.resolve(system, system.parse(witnessType))
+                        .fold(
+                            error -> {
+                              trees.printMessage(
+                                  Diagnostic.Kind.ERROR,
+                                  "Failed to resolve witness for type: "
+                                      + witnessType
+                                      + "\nReason: "
+                                      + error.format(),
+                                  getCurrentPath().getLeaf(),
+                                  getCurrentPath().getCompilationUnit());
+                              return unit();
+                            },
+                            plan -> unit()));
+
+        return super.visitMethodInvocation(node, arg);
+      }
     }
 
     @Override
     public void visitApply(JCTree.JCMethodInvocation tree) {
-      // Initialize result to the input tree (TreeTranslator convention)
-      result = tree;
-
-      // Check if this is a call to TypeClasses.witness() BEFORE calling super
-      TreePath path = trees.getPath(currentCompilationUnit, tree);
-
-      if (path != null) {
-        Maybe<TypeMirror> witnessType =
-            Parser.<MethodInvocationTree>identity()
-                .guard(
-                    Parser.<MethodInvocationTree>currentElement()
-                        .flatMap(Parser.methodMatches(WITNESS_METHOD)))
-                .flatMap(Parser.unaryCallArgument())
-                .flatMap(Parser.newAnonymousClassBody())
-                .flatMap(Parser.singleImplementsClause())
-                .flatMap(Parser.treeTypeMirror())
-                .flatMap(Parser.rawTypeMatches(Ty.class))
-                .flatMap(Parser.unaryTypeArgument())
-                .parse(trees, path, tree);
-
-        witnessType.fold(
-            Unit::unit,
-            wt -> {
-              WitnessResolution.resolve(system, system.parse(wt))
-                  .fold(
-                      error -> {
-                        trees.printMessage(
-                            Diagnostic.Kind.ERROR,
-                            "Failed to resolve witness for type: "
-                                + wt
-                                + "\nReason: "
-                                + error.format(),
-                            tree,
-                            currentCompilationUnit);
-                        return unit();
-                      },
-                      plan -> {
-                        // AST transformation infrastructure is in place
-                        // Transformation is currently disabled because it requires proper
-                        // type attribution of the generated nodes to avoid compilation errors
-                        // Enable by setting result = buildInstantiationTree(plan)
-                        return unit();
-                      });
-              return unit();
-            });
-      }
-
-      // Only call super if we didn't transform
-      if (result == tree) {
-        super.visitApply(tree);
-      }
+      // Always call super - transformation disabled due to type attribution issues
+      super.visitApply(tree);
     }
 
     /** Recursively builds a JCTree from an InstantiationPlan. */
