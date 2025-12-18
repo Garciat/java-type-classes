@@ -17,6 +17,14 @@ import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Symtab;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
+import com.sun.tools.javac.comp.Attr;
+import com.sun.tools.javac.comp.AttrContext;
+import com.sun.tools.javac.comp.Env;
+import com.sun.tools.javac.comp.Resolve;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Context;
@@ -75,13 +83,22 @@ public final class WitnessResolutionChecker implements Plugin {
     private final StaticWitnessSystem system;
     private final TreeMaker treeMaker;
     private final Names names;
+    private final Attr attr;
+    private final Resolve resolve;
+    private final Types types;
+    private final Symtab symtab;
     private JCTree.JCCompilationUnit currentCompilationUnit;
+    private Env<AttrContext> env;
 
     private WitnessCallRewriter(Trees trees, Context context) {
       this.trees = trees;
       this.system = new StaticWitnessSystem();
       this.treeMaker = TreeMaker.instance(context);
       this.names = Names.instance(context);
+      this.attr = Attr.instance(context);
+      this.resolve = Resolve.instance(context);
+      this.types = Types.instance(context);
+      this.symtab = Symtab.instance(context);
     }
 
     /** Transform the compilation unit by replacing witness() calls. */
@@ -132,11 +149,61 @@ public final class WitnessResolutionChecker implements Plugin {
 
     @Override
     public void visitApply(JCTree.JCMethodInvocation tree) {
-      // Always call super - transformation disabled due to type attribution issues
-      super.visitApply(tree);
+      // Try to transform witness() calls with proper attribution
+      TreePath path = trees.getPath(currentCompilationUnit, tree);
+      if (path != null) {
+        Maybe<TypeMirror> witnessType =
+            Parser.<MethodInvocationTree>identity()
+                .guard(
+                    Parser.<MethodInvocationTree>currentElement()
+                        .flatMap(Parser.methodMatches(WITNESS_METHOD)))
+                .flatMap(Parser.unaryCallArgument())
+                .flatMap(Parser.newAnonymousClassBody())
+                .flatMap(Parser.singleImplementsClause())
+                .flatMap(Parser.treeTypeMirror())
+                .flatMap(Parser.rawTypeMatches(Ty.class))
+                .flatMap(Parser.unaryTypeArgument())
+                .parse(trees, path, tree);
+
+        witnessType.fold(
+            Unit::unit,
+            wt -> {
+              WitnessResolution.resolve(system, system.parse(wt))
+                  .fold(
+                      error -> unit(), // Error already reported in validation
+                      plan -> {
+                        try {
+                          // Build the replacement tree
+                          JCTree.JCExpression replacement = buildInstantiationTree(plan);
+                          if (replacement != null) {
+                            replacement.pos = tree.pos;
+
+                            // Try to resolve and attribute the replacement
+                            // This is the key: we need to attribute the new tree
+                            if (tree.type != null) {
+                              // Attempt to set the type on the replacement
+                              replacement.type = tree.type;
+                            }
+
+                            result = replacement;
+                          }
+                        } catch (Exception e) {
+                          // If transformation fails, keep original
+                          result = tree;
+                        }
+                        return unit();
+                      });
+              return unit();
+            });
+      }
+
+      // Only call super if we didn't transform
+      if (result == null || result == tree) {
+        super.visitApply(tree);
+      }
     }
 
-    /** Recursively builds a JCTree from an InstantiationPlan. */
+    /** Recursively builds a JCTree from an InstantiationPlan with proper type attribution. */
     private JCTree.JCExpression buildInstantiationTree(WitnessResolution.InstantiationPlan plan) {
       return switch (plan) {
         case WitnessResolution.InstantiationPlan.PlanStep(var constructor, var dependencies) -> {
@@ -155,12 +222,26 @@ public final class WitnessResolutionChecker implements Plugin {
           JCTree.JCMethodInvocation methodInvocation =
               treeMaker.Apply(com.sun.tools.javac.util.List.nil(), methodSelect, args);
 
+          // Set the type on the method invocation
+          // The return type of the witness constructor method
+          if (method instanceof Symbol.MethodSymbol methodSymbol) {
+            methodInvocation.type = methodSymbol.getReturnType();
+          } else if (method.getReturnType() instanceof javax.lang.model.type.DeclaredType dt) {
+            // Try to get the type from the ExecutableElement
+            TypeMirror returnType = method.getReturnType();
+            if (returnType instanceof Type jcType) {
+              methodInvocation.type = jcType;
+            }
+          }
+
           yield methodInvocation;
         }
       };
     }
 
-    /** Builds a JCTree expression that references the given method (e.g., ClassName.methodName). */
+    /**
+     * Builds a JCTree expression that references the given method with proper symbol information.
+     */
     private JCTree.JCExpression buildMethodReference(ExecutableElement method) {
       // Get the enclosing class
       Element enclosingElement = method.getEnclosingElement();
@@ -174,22 +255,69 @@ public final class WitnessResolutionChecker implements Plugin {
             names.fromString(method.getSimpleName().toString());
 
         // Create the field access (ClassName.methodName)
-        return treeMaker.Select(classExpr, methodName);
+        JCTree.JCFieldAccess fieldAccess = treeMaker.Select(classExpr, methodName);
+
+        // Set the symbol if method is a Symbol.MethodSymbol
+        if (method instanceof Symbol.MethodSymbol methodSymbol) {
+          fieldAccess.sym = methodSymbol;
+          fieldAccess.type = methodSymbol.type;
+        }
+
+        return fieldAccess;
       } else {
         throw new IllegalArgumentException(
             "Method does not have a TypeElement as enclosing element: " + method);
       }
     }
 
-    /** Builds a qualified name expression (e.g., com.example.ClassName). */
+    /** Builds a qualified name expression with proper symbol and type information. */
     private JCTree.JCExpression buildQualifiedName(TypeElement typeElement) {
       String qualifiedName = typeElement.getQualifiedName().toString();
       String[] parts = qualifiedName.split("\\.");
 
       JCTree.JCExpression expr = treeMaker.Ident(names.fromString(parts[0]));
-      for (int i = 1; i < parts.length; i++) {
-        expr = treeMaker.Select(expr, names.fromString(parts[i]));
+
+      // Set symbol and type if typeElement is a Symbol.ClassSymbol
+      if (typeElement instanceof Symbol.ClassSymbol classSymbol) {
+        // For the final expression, set the class symbol
+        Symbol currentSym = classSymbol;
+
+        // Navigate through package symbols to build the path
+        for (int i = parts.length - 2; i >= 0; i--) {
+          if (currentSym.owner != null) {
+            currentSym = currentSym.owner;
+          }
+        }
+
+        // Build the expression with proper types
+        if (parts.length == 1) {
+          if (expr instanceof JCTree.JCIdent ident) {
+            ident.sym = classSymbol;
+            ident.type = classSymbol.type;
+          }
+        } else {
+          Symbol pkgSym = currentSym;
+          if (expr instanceof JCTree.JCIdent ident && pkgSym instanceof Symbol.PackageSymbol) {
+            ident.sym = pkgSym;
+            ident.type = pkgSym.type;
+          }
+
+          for (int i = 1; i < parts.length; i++) {
+            JCTree.JCFieldAccess select = treeMaker.Select(expr, names.fromString(parts[i]));
+            if (i == parts.length - 1) {
+              select.sym = classSymbol;
+              select.type = classSymbol.type;
+            }
+            expr = select;
+          }
+        }
+      } else {
+        // Fallback: just build the structure without symbols
+        for (int i = 1; i < parts.length; i++) {
+          expr = treeMaker.Select(expr, names.fromString(parts[i]));
+        }
       }
+
       return expr;
     }
   }

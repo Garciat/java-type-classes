@@ -62,6 +62,7 @@
               <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=com.garciat.typeclasses</arg>
               <arg>--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
               <arg>--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+              <arg>--add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
               <arg>--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
               <arg>--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
               <arg>--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
@@ -70,6 +71,7 @@
               <arg>--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
               <arg>--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
               <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+              <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
               <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
               <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
               <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
@@ -101,6 +103,7 @@
             <argLine>
               --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
               --add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED
+              --add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED
               --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
               --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
               --add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED
