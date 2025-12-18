@@ -18,6 +18,12 @@ import com.sun.source.util.TaskListener;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.api.JavacTrees;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeMaker;
+import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Names;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Objects;
@@ -48,6 +54,7 @@ public final class WitnessResolutionChecker implements Plugin {
 
   @Override
   public void init(JavacTask task, String... args) {
+    Context context = ((com.sun.tools.javac.api.BasicJavacTask) task).getContext();
     task.addTaskListener(
         new TaskListener() {
           @Override
@@ -60,53 +67,136 @@ public final class WitnessResolutionChecker implements Plugin {
               return;
             }
 
-            new WitnessCallScanner(Trees.instance(task)).scan(e.getCompilationUnit(), null);
+            new WitnessCallRewriter(Trees.instance(task), context)
+                .translate((JCTree.JCCompilationUnit) e.getCompilationUnit());
           }
         });
   }
 
-  /** Scanner that finds calls to TypeClasses.witness() and validates them. */
-  private static class WitnessCallScanner extends TreePathScanner<Void, Void> {
+  /** Rewriter that finds calls to TypeClasses.witness() and rewrites them with actual calls. */
+  @SuppressWarnings("NullAway")
+  private static class WitnessCallRewriter extends com.sun.tools.javac.tree.TreeTranslator {
     private final Trees trees;
     private final StaticWitnessSystem system;
+    private final TreeMaker treeMaker;
+    private final Names names;
+    private JCTree.JCCompilationUnit currentCompilationUnit;
 
-    private WitnessCallScanner(Trees trees) {
+    private WitnessCallRewriter(Trees trees, Context context) {
       this.trees = trees;
       this.system = new StaticWitnessSystem();
+      this.treeMaker = TreeMaker.instance(context);
+      this.names = Names.instance(context);
+    }
+
+    public void translate(JCTree.JCCompilationUnit compilationUnit) {
+      this.currentCompilationUnit = compilationUnit;
+      compilationUnit.defs = translate(compilationUnit.defs);
     }
 
     @Override
-    public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
-      Parser.<MethodInvocationTree>identity()
-          .guard(
-              Parser.<MethodInvocationTree>currentElement()
-                  .flatMap(Parser.methodMatches(WITNESS_METHOD)))
-          .flatMap(Parser.unaryCallArgument())
-          .flatMap(Parser.newAnonymousClassBody())
-          .flatMap(Parser.singleImplementsClause())
-          .flatMap(Parser.treeTypeMirror())
-          .flatMap(Parser.rawTypeMatches(Ty.class))
-          .flatMap(Parser.unaryTypeArgument())
-          .parse(trees, getCurrentPath(), node)
-          .fold(
-              Unit::unit,
-              witnessType ->
-                  WitnessResolution.resolve(system, system.parse(witnessType))
-                      .fold(
-                          error -> {
-                            this.trees.printMessage(
-                                Diagnostic.Kind.ERROR,
-                                "Failed to resolve witness for type: "
-                                    + witnessType
-                                    + "\nReason: "
-                                    + error.format(),
-                                getCurrentPath().getLeaf(),
-                                getCurrentPath().getCompilationUnit());
-                            return unit();
-                          },
-                          plan -> unit()));
+    public void visitApply(JCTree.JCMethodInvocation tree) {
+      super.visitApply(tree);
 
-      return super.visitMethodInvocation(node, arg);
+      // Check if this is a call to TypeClasses.witness()
+      TreePath path = trees.getPath(currentCompilationUnit, tree);
+      if (path == null) {
+        return;
+      }
+
+      Maybe<TypeMirror> witnessType =
+          Parser.<MethodInvocationTree>identity()
+              .guard(
+                  Parser.<MethodInvocationTree>currentElement()
+                      .flatMap(Parser.methodMatches(WITNESS_METHOD)))
+              .flatMap(Parser.unaryCallArgument())
+              .flatMap(Parser.newAnonymousClassBody())
+              .flatMap(Parser.singleImplementsClause())
+              .flatMap(Parser.treeTypeMirror())
+              .flatMap(Parser.rawTypeMatches(Ty.class))
+              .flatMap(Parser.unaryTypeArgument())
+              .parse(trees, path, tree);
+
+      witnessType.fold(
+          Unit::unit,
+          wt -> {
+            WitnessResolution.resolve(system, system.parse(wt))
+                .fold(
+                    error -> {
+                      trees.printMessage(
+                          Diagnostic.Kind.ERROR,
+                          "Failed to resolve witness for type: "
+                              + wt
+                              + "\nReason: "
+                              + error.format(),
+                          tree,
+                          currentCompilationUnit);
+                      return unit();
+                    },
+                    plan -> {
+                      // Replace the current tree with the generated code
+                      result = buildInstantiationTree(plan);
+                      return unit();
+                    });
+            return unit();
+          });
+    }
+
+    /** Recursively builds a JCTree from an InstantiationPlan. */
+    private JCTree.JCExpression buildInstantiationTree(WitnessResolution.InstantiationPlan plan) {
+      return switch (plan) {
+        case WitnessResolution.InstantiationPlan.PlanStep(
+            var constructor, var dependencies) -> {
+          // Get the ExecutableElement for the witness constructor
+          ExecutableElement method = constructor.method();
+
+          // Build the method reference
+          JCTree.JCExpression methodSelect = buildMethodReference(method);
+
+          // Build the arguments by recursively processing dependencies
+          com.sun.tools.javac.util.List<JCTree.JCExpression> args =
+              com.sun.tools.javac.util.List.from(
+                  dependencies.stream().map(this::buildInstantiationTree).toList());
+
+          // Create the method invocation
+          yield treeMaker.Apply(com.sun.tools.javac.util.List.nil(), methodSelect, args);
+        }
+      };
+    }
+
+    /**
+     * Builds a JCTree expression that references the given method (e.g., ClassName.methodName).
+     */
+    private JCTree.JCExpression buildMethodReference(ExecutableElement method) {
+      // Get the enclosing class
+      Element enclosingElement = method.getEnclosingElement();
+
+      if (enclosingElement instanceof TypeElement typeElement) {
+        // Build the class name expression
+        JCTree.JCExpression classExpr = buildQualifiedName(typeElement);
+
+        // Build the method name
+        com.sun.tools.javac.util.Name methodName =
+            names.fromString(method.getSimpleName().toString());
+
+        // Create the field access (ClassName.methodName)
+        return treeMaker.Select(classExpr, methodName);
+      } else {
+        throw new IllegalArgumentException(
+            "Method does not have a TypeElement as enclosing element: " + method);
+      }
+    }
+
+    /** Builds a qualified name expression (e.g., com.example.ClassName). */
+    private JCTree.JCExpression buildQualifiedName(TypeElement typeElement) {
+      String qualifiedName = typeElement.getQualifiedName().toString();
+      String[] parts = qualifiedName.split("\\.");
+
+      JCTree.JCExpression expr = treeMaker.Ident(names.fromString(parts[0]));
+      for (int i = 1; i < parts.length; i++) {
+        expr = treeMaker.Select(expr, names.fromString(parts[i]));
+      }
+      return expr;
     }
   }
 }
