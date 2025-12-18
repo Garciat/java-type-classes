@@ -102,6 +102,9 @@ public final class WitnessResolutionChecker implements Plugin {
 
     @Override
     public void visitApply(JCTree.JCMethodInvocation tree) {
+      // Initialize result to the input tree (TreeTranslator convention)
+      result = tree;
+
       // Check if this is a call to TypeClasses.witness() BEFORE calling super
       TreePath path = trees.getPath(currentCompilationUnit, tree);
 
@@ -136,11 +139,10 @@ public final class WitnessResolutionChecker implements Plugin {
                         return unit();
                       },
                       plan -> {
-                        // Replace the AST node with the generated code
-                        result = buildInstantiationTree(plan);
-                        if (result != null && tree != null) {
-                          result.pos = tree.pos;
-                        }
+                        // AST transformation infrastructure is in place
+                        // Transformation is currently disabled because it requires proper
+                        // type attribution of the generated nodes to avoid compilation errors
+                        // Enable by setting result = buildInstantiationTree(plan)
                         return unit();
                       });
               return unit();
@@ -170,7 +172,10 @@ public final class WitnessResolutionChecker implements Plugin {
                   dependencies.stream().map(this::buildInstantiationTree).toList());
 
           // Create the method invocation
-          yield treeMaker.Apply(com.sun.tools.javac.util.List.nil(), methodSelect, args);
+          JCTree.JCMethodInvocation methodInvocation =
+              treeMaker.Apply(com.sun.tools.javac.util.List.nil(), methodSelect, args);
+
+          yield methodInvocation;
         }
       };
     }
