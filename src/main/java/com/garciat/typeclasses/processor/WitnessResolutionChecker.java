@@ -136,41 +136,21 @@ public final class WitnessResolutionChecker implements Plugin {
                         return unit();
                       },
                       plan -> {
-                        // AST REWRITING - Currently disabled for prototype
-                        // To enable AST rewriting, uncomment the following lines:
-                        // The buildInstantiationTree() method below shows how to construct
-                        // the replacement tree from the InstantiationPlan.
-                        //
-                        // However, proper AST transformation requires careful handling:
-                        // 1. Transform during ENTER phase, not ANALYZE
-                        // 2. Properly attribute the new nodes (types, symbols)
-                        // 3. Handle all edge cases for tree replacement
-                        //
-                        // For a production implementation, consider using javac's
-                        // TreeMaker in an earlier phase or investigate annotation
-                        // processing as an alternative approach.
-                        //
-                        // Uncomment to enable (may cause compilation errors):
-                        // try {
-                        //   result = buildInstantiationTree(plan);
-                        //   if (result != null && tree != null) {
-                        //     result.pos = tree.pos;
-                        //   }
-                        // } catch (Exception e) {
-                        //   trees.printMessage(
-                        //       Diagnostic.Kind.WARNING,
-                        //       "Failed to transform witness call: " + e.getMessage(),
-                        //       tree,
-                        //       currentCompilationUnit);
-                        // }
+                        // Replace the AST node with the generated code
+                        result = buildInstantiationTree(plan);
+                        if (result != null && tree != null) {
+                          result.pos = tree.pos;
+                        }
                         return unit();
                       });
               return unit();
             });
       }
 
-      // Always call super since we're not transforming
-      super.visitApply(tree);
+      // Only call super if we didn't transform
+      if (result == tree) {
+        super.visitApply(tree);
+      }
     }
 
     /** Recursively builds a JCTree from an InstantiationPlan. */
