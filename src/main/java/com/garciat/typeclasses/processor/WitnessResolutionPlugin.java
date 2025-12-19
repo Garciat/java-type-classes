@@ -42,11 +42,18 @@ public class WitnessResolutionPlugin implements Plugin {
     private final Trees trees;
     private final StaticWitnessSystem system;
     private final AstRewriter astRewriter;
+    private JCTree.JCCompilationUnit currentCompilationUnit;
 
     private WitnessRewriter(Trees trees, AstRewriter astRewriter) {
       this.trees = trees;
       this.system = new StaticWitnessSystem();
       this.astRewriter = astRewriter;
+    }
+
+    @Override
+    public void visitTopLevel(JCTree.JCCompilationUnit tree) {
+      this.currentCompilationUnit = tree;
+      super.visitTopLevel(tree);
     }
 
     @Override
@@ -89,8 +96,14 @@ public class WitnessResolutionPlugin implements Plugin {
           // The annotation processor will validate it
         }
       } catch (Exception e) {
-        // Log error but don't fail compilation
-        System.err.println("Warning: Failed to rewrite witness call: " + e.getMessage());
+        // Report as a note, not an error, since this is best-effort rewriting
+        if (currentCompilationUnit != null) {
+          trees.printMessage(
+              javax.tools.Diagnostic.Kind.NOTE,
+              "Note: Could not rewrite witness call: " + e.getMessage(),
+              tree,
+              currentCompilationUnit);
+        }
       }
     }
 
@@ -109,8 +122,14 @@ public class WitnessResolutionPlugin implements Plugin {
                   return null;
                 });
       } catch (Exception e) {
-        // Don't rewrite on error
-        System.err.println("Warning: Failed to parse type for witness: " + e.getMessage());
+        // Report as a note for debugging
+        if (currentCompilationUnit != null) {
+          trees.printMessage(
+              javax.tools.Diagnostic.Kind.NOTE,
+              "Note: Could not parse type for witness rewriting: " + e.getMessage(),
+              tree,
+              currentCompilationUnit);
+        }
       }
     }
   }

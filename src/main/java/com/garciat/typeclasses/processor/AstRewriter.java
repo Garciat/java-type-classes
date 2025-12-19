@@ -60,11 +60,11 @@ public final class AstRewriter {
           treeMaker.Select(classRef, names.fromString(method.getSimpleName().toString()));
 
       // Recursively build arguments from dependencies
-      List<JCTree.JCExpression> args =
-          List.from(
+      com.sun.tools.javac.util.List<JCTree.JCExpression> args =
+          com.sun.tools.javac.util.List.from(
               step.dependencies().stream()
                   .map(this::buildWitnessInvocationRecursive)
-                  .toArray(JCTree.JCExpression[]::new));
+                  .collect(java.util.stream.Collectors.toList()));
 
       // Build the method invocation
       return treeMaker.Apply(List.nil(), methodSelect, args);
