@@ -4,10 +4,15 @@ import static com.garciat.typeclasses.types.Unit.unit;
 
 import com.garciat.typeclasses.TypeClasses;
 import com.garciat.typeclasses.api.Ty;
+import com.garciat.typeclasses.processor.WitnessResolution.InstantiationPlan;
 import com.garciat.typeclasses.types.Unit;
 import com.sun.source.tree.MethodInvocationTree;
-import com.sun.source.util.TreePathScanner;
-import com.sun.source.util.Trees;
+import com.sun.source.util.*;
+import com.sun.tools.javac.api.BasicJavacTask;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeTranslator;
+import com.sun.tools.javac.util.Context;
 import java.lang.reflect.Method;
 import java.util.Set;
 import javax.annotation.processing.*;
@@ -32,37 +37,73 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
   }
 
   private Trees trees;
-  private AstRewriter astRewriter;
+  private Context context;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
+    super.init(processingEnv);
     this.trees = Trees.instance(processingEnv);
-    this.astRewriter = new AstRewriter(((com.sun.tools.javac.processing.JavacProcessingEnvironment) processingEnv).getContext(), trees);
+    
+    // Get the JavacTask and Context for AST rewriting
+    if (processingEnv instanceof com.sun.tools.javac.processing.JavacProcessingEnvironment javacEnv) {
+      this.context = javacEnv.getContext();
+      
+      // Try to get JavacTask from the context using different approaches
+      try {
+        // First try: Get BasicJavacTask directly
+        BasicJavacTask task = context.get(BasicJavacTask.class);
+        if (task != null) {
+          task.addTaskListener(new AstTransformListener());
+        } else {
+          // Second try: Get JavacTaskImpl
+          com.sun.tools.javac.api.JavacTaskImpl taskImpl = context.get(com.sun.tools.javac.api.JavacTaskImpl.class);
+          if (taskImpl != null) {
+            taskImpl.addTaskListener(new AstTransformListener());
+          }
+        }
+      } catch (Exception e) {
+        // Silent failure - AST rewriting won't work but validation will still happen
+      }
+    }
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
     for (Element rootElement : roundEnv.getRootElements()) {
-      new WitnessCallScanner(trees, astRewriter).scan(trees.getPath(rootElement), null);
+      new WitnessCallScanner(trees).scan(trees.getPath(rootElement), null);
     }
     return false;
+  }
+
+  /**
+   * TaskListener that runs after ANALYZE phase to perform AST transformations.
+   */
+  private class AstTransformListener implements TaskListener {
+    @Override
+    public void finished(TaskEvent e) {
+      if (e.getKind() == TaskEvent.Kind.ANALYZE) {
+        // Perform AST transformation after type attribution is complete
+        if (e.getCompilationUnit() != null && context != null) {
+          JCTree.JCCompilationUnit cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+          cu.accept(new WitnessCallTranslator(context, trees));
+        }
+      }
+    }
   }
 
   /** Scanner that finds calls to TypeClasses.witness() and validates them. */
   private static class WitnessCallScanner extends TreePathScanner<Void, Void> {
     private final Trees trees;
     private final StaticWitnessSystem system;
-    private final AstRewriter astRewriter;
 
-    private WitnessCallScanner(Trees trees, AstRewriter astRewriter) {
+    private WitnessCallScanner(Trees trees) {
       this.trees = trees;
       this.system = new StaticWitnessSystem();
-      this.astRewriter = astRewriter;
     }
 
     @Override
     public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
-      // Check if this is a parameterless witness() call
+      // Check if this is a parameterless witness() call - validate it
       handleParameterlessWitnessCall(node);
 
       // Check if this is a witness(Ty) call
@@ -99,11 +140,9 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
     }
 
     /**
-     * Handles parameterless witness() calls by resolving the witness type from the expected type
-     * and rewriting the AST.
+     * Validates parameterless witness() calls.
      */
     private void handleParameterlessWitnessCall(MethodInvocationTree node) {
-      // First, check if this is a parameterless witness() call
       TreeParser.<MethodInvocationTree>identity()
           .guard(
               TreeParser.<MethodInvocationTree>currentElement()
@@ -113,12 +152,12 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
           .fold(
               Unit::unit,
               _ -> {
-                // Get the expected type from the context (e.g., variable declaration)
+                // Get the expected type from the context
                 var expectedType = trees.getTypeMirror(getCurrentPath());
                 if (expectedType != null) {
                   var parsedType = system.parse(expectedType);
 
-                  // Resolve the witness
+                  // Validate that witness can be resolved
                   WitnessResolution.resolve(system, parsedType)
                       .fold(
                           error -> {
@@ -132,15 +171,64 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
                                 getCurrentPath().getCompilationUnit());
                             return unit();
                           },
-                          plan -> {
-                            // Success! Rewrite the AST
-                            var replacement = astRewriter.buildWitnessExpression(plan);
-                            astRewriter.replaceTree(getCurrentPath(), replacement);
-                            return unit();
-                          });
+                          plan -> unit());
                 }
                 return unit();
               });
+    }
+  }
+
+  /**
+   * Tree translator that rewrites parameterless witness() calls.
+   */
+  private static class WitnessCallTranslator extends TreeTranslator {
+    private final AstRewriter astRewriter;
+    private final StaticWitnessSystem system;
+    private final Trees trees;
+
+    private WitnessCallTranslator(Context context, Trees trees) {
+      this.astRewriter = new AstRewriter(context, trees);
+      this.system = new StaticWitnessSystem();
+      this.trees = trees;
+    }
+
+    @Override
+    public void visitApply(JCTree.JCMethodInvocation tree) {
+      // First visit the method expression and arguments
+      tree.meth = translate(tree.meth);
+      tree.args = translate(tree.args);
+      tree.typeargs = translate(tree.typeargs);
+      
+      // Now check if this is a call to the parameterless witness() method
+      if (tree.meth instanceof JCTree.JCFieldAccess fieldAccess) {
+        if (fieldAccess.sym instanceof Symbol.MethodSymbol methodSymbol) {
+          // Check if it matches our parameterless witness method
+          if (methodSymbol.getSimpleName().toString().equals("witness") 
+              && methodSymbol.params().isEmpty()
+              && methodSymbol.owner.toString().equals(TypeClasses.class.getName())) {
+            
+            // This is a parameterless witness() call - try to rewrite it
+            if (tree.type != null) {
+              var parsedType = system.parse(tree.type);
+              WitnessResolution.resolve(system, parsedType)
+                  .fold(
+                      error -> null, // Validation phase already reported the error
+                      plan -> {
+                        // Build the replacement expression
+                        JCTree.JCExpression replacement = astRewriter.buildWitnessExpression(plan);
+                        // Set the result to replace this node
+                        result = replacement;
+                        return null;
+                      });
+            }
+          }
+        }
+      }
+      
+      // If we didn't replace it, keep the original
+      if (result == null) {
+        result = tree;
+      }
     }
   }
 }
