@@ -20,26 +20,30 @@ import javax.tools.Diagnostic;
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class WitnessResolutionChecker extends AbstractProcessor {
   private static final Method WITNESS_METHOD;
+  private static final Method PARAMETERLESS_WITNESS_METHOD;
 
   static {
     try {
       WITNESS_METHOD = TypeClasses.class.getMethod("witness", Ty.class);
+      PARAMETERLESS_WITNESS_METHOD = TypeClasses.class.getMethod("witness");
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
   }
 
   private Trees trees;
+  private AstRewriter astRewriter;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     this.trees = Trees.instance(processingEnv);
+    this.astRewriter = new AstRewriter(((com.sun.tools.javac.processing.JavacProcessingEnvironment) processingEnv).getContext(), trees);
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
     for (Element rootElement : roundEnv.getRootElements()) {
-      new WitnessCallScanner(trees).scan(trees.getPath(rootElement), null);
+      new WitnessCallScanner(trees, astRewriter).scan(trees.getPath(rootElement), null);
     }
     return false;
   }
@@ -48,14 +52,20 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
   private static class WitnessCallScanner extends TreePathScanner<Void, Void> {
     private final Trees trees;
     private final StaticWitnessSystem system;
+    private final AstRewriter astRewriter;
 
-    private WitnessCallScanner(Trees trees) {
+    private WitnessCallScanner(Trees trees, AstRewriter astRewriter) {
       this.trees = trees;
       this.system = new StaticWitnessSystem();
+      this.astRewriter = astRewriter;
     }
 
     @Override
     public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
+      // Check if this is a parameterless witness() call
+      handleParameterlessWitnessCall(node);
+
+      // Check if this is a witness(Ty) call
       TreeParser.<MethodInvocationTree>identity()
           .guard(
               TreeParser.<MethodInvocationTree>currentElement()
@@ -86,6 +96,51 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
                           _ -> unit()));
 
       return super.visitMethodInvocation(node, arg);
+    }
+
+    /**
+     * Handles parameterless witness() calls by resolving the witness type from the expected type
+     * and rewriting the AST.
+     */
+    private void handleParameterlessWitnessCall(MethodInvocationTree node) {
+      // First, check if this is a parameterless witness() call
+      TreeParser.<MethodInvocationTree>identity()
+          .guard(
+              TreeParser.<MethodInvocationTree>currentElement()
+                  .flatMap(TreeParser.methodMatches(PARAMETERLESS_WITNESS_METHOD)))
+          .filter(invocation -> invocation.getArguments().isEmpty())
+          .parse(trees, getCurrentPath(), node)
+          .fold(
+              Unit::unit,
+              _ -> {
+                // Get the expected type from the context (e.g., variable declaration)
+                var expectedType = trees.getTypeMirror(getCurrentPath());
+                if (expectedType != null) {
+                  var parsedType = system.parse(expectedType);
+
+                  // Resolve the witness
+                  WitnessResolution.resolve(system, parsedType)
+                      .fold(
+                          error -> {
+                            this.trees.printMessage(
+                                Diagnostic.Kind.ERROR,
+                                "Failed to resolve witness for parameterless witness() call with type: "
+                                    + expectedType
+                                    + "\nReason: "
+                                    + error.format(),
+                                getCurrentPath().getLeaf(),
+                                getCurrentPath().getCompilationUnit());
+                            return unit();
+                          },
+                          plan -> {
+                            // Success! Rewrite the AST
+                            var replacement = astRewriter.buildWitnessExpression(plan);
+                            astRewriter.replaceTree(getCurrentPath(), replacement);
+                            return unit();
+                          });
+                }
+                return unit();
+              });
     }
   }
 }

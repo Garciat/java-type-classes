@@ -20,6 +20,17 @@ public final class TypeClasses {
     };
   }
 
+  /**
+   * Parameterless witness method that should be rewritten by the compiler. This method should never
+   * be called at runtime; the compiler will replace it with the appropriate witness constructor
+   * calls.
+   */
+  public static <T> T witness() {
+    throw new AssertionError(
+        "witness() should have been rewritten by the compiler. "
+            + "Make sure the WitnessResolutionChecker annotation processor is enabled.");
+  }
+
   public static class WitnessResolutionException extends RuntimeException {
     private WitnessResolutionException(SummonError error) {
       super(error.format());
