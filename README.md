@@ -72,7 +72,7 @@ public interface Show<T> {
 
   // "Recursive" witness:
   @TypeClass.Witness
-  static <T> Show<List<T>> listShow(Show<T> elemShow) {
+  static <A> Show<List<A>> listShow(Show<A> showA) {
     return listA -> listA.stream().map(showA::show).collect(Collectors.joining(", ", "[", "]"));
   }
 }
