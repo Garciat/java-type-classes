@@ -20,6 +20,21 @@ public final class TypeClasses {
     };
   }
 
+  /**
+   * Parameterless witness method that gets rewritten by the compiler plugin. This method should
+   * never be called at runtime - the compiler plugin will replace calls to this method with direct
+   * witness constructor invocations.
+   *
+   * @param <T> The witness type to resolve
+   * @return The witness instance (at compile time, replaced with constructor calls)
+   * @throws UnsupportedOperationException if called at runtime without compiler plugin
+   */
+  public static <T> T witness() {
+    throw new UnsupportedOperationException(
+        "witness() without parameters should only be used with the compiler plugin enabled. "
+            + "Use witness(Ty<T>) for runtime resolution.");
+  }
+
   public static class WitnessResolutionException extends RuntimeException {
     private WitnessResolutionException(SummonError error) {
       super(error.format());

@@ -20,10 +20,12 @@ import javax.tools.Diagnostic;
  * A javac plugin that rewrites witness() calls into direct witness constructor invocations.
  */
 public class WitnessResolutionPlugin implements Plugin {
+  private static final Method PARAMETERLESS_WITNESS_METHOD;
   private static final Method WITNESS_METHOD;
 
   static {
     try {
+      PARAMETERLESS_WITNESS_METHOD = TypeClasses.class.getMethod("witness");
       WITNESS_METHOD = TypeClasses.class.getMethod("witness", Ty.class);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
@@ -82,6 +84,21 @@ public class WitnessResolutionPlugin implements Plugin {
 
     @Override
     public Void visitMethodInvocation(MethodInvocationTree node, Void arg) {
+      // Try to match the parameterless witness() method first
+      TreeParser.<MethodInvocationTree>identity()
+          .guard(
+              TreeParser.<MethodInvocationTree>currentElement()
+                  .flatMap(TreeParser.methodMatches(PARAMETERLESS_WITNESS_METHOD)))
+          .parse(trees, getCurrentPath(), node)
+          .fold(
+              Unit::unit,
+              _ -> {
+                // For parameterless witness(), get type from the assignment context
+                handleParameterlessWitness(node);
+                return unit();
+              });
+
+      // Try to match the parameterful witness(Ty<T>) method
       TreeParser.<MethodInvocationTree>identity()
           .guard(
               TreeParser.<MethodInvocationTree>currentElement()
@@ -126,6 +143,50 @@ public class WitnessResolutionPlugin implements Plugin {
                           }));
 
       return super.visitMethodInvocation(node, arg);
+    }
+
+    private void handleParameterlessWitness(MethodInvocationTree node) {
+      try {
+        // Get the type from the current tree path
+        JCTree.JCMethodInvocation jcNode = (JCTree.JCMethodInvocation) node;
+        
+        // The type should be set by javac's type attribution phase
+        if (jcNode.type != null) {
+          WitnessResolution.resolve(system, system.parse(jcNode.type))
+              .fold(
+                  error -> {
+                    this.trees.printMessage(
+                        Diagnostic.Kind.ERROR,
+                        "Failed to resolve witness for type: "
+                            + jcNode.type
+                            + "\nReason: "
+                            + error.format(),
+                        getCurrentPath().getLeaf(),
+                        getCurrentPath().getCompilationUnit());
+                    return unit();
+                  },
+                  plan -> {
+                    // On success, compute the replacement
+                    try {
+                      JCTree.JCExpression replacement = astRewriter.buildWitnessInvocation(plan);
+                      replacements.put(jcNode, replacement);
+                    } catch (Exception e) {
+                      this.trees.printMessage(
+                          Diagnostic.Kind.WARNING,
+                          "Failed to build replacement: " + e.getMessage(),
+                          getCurrentPath().getLeaf(),
+                          getCurrentPath().getCompilationUnit());
+                    }
+                    return unit();
+                  });
+        }
+      } catch (Exception e) {
+        this.trees.printMessage(
+            Diagnostic.Kind.WARNING,
+            "Failed to process parameterless witness(): " + e.getMessage(),
+            getCurrentPath().getLeaf(),
+            getCurrentPath().getCompilationUnit());
+      }
     }
   }
 
