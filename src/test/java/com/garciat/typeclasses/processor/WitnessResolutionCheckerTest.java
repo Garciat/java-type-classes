@@ -7,15 +7,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardLocation;
-import javax.tools.ToolProvider;
+import javax.tools.*;
+
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-public class WitnessResolutionProcessorTest {
+public class WitnessResolutionCheckerTest {
   @Nullable @TempDir Path tempDir;
 
   @Test
@@ -41,12 +39,10 @@ public class WitnessResolutionProcessorTest {
             null,
             fileManager,
             diagnostics,
-            List.of(
-                "-Xplugin:WitnessResolutionChecker",
-                "-classpath",
-                System.getProperty("java.class.path")),
+            List.of("-classpath", System.getProperty("java.class.path")),
             null,
             compilationUnits);
+    task.setProcessors(List.of(new WitnessResolutionChecker()));
 
     // When
     boolean success = task.call();

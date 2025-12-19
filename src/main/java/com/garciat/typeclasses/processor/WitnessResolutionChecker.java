@@ -11,18 +11,20 @@ import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.Plugin;
-import com.sun.source.util.TaskEvent;
-import com.sun.source.util.TaskListener;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedSourceVersion;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -30,7 +32,9 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 
-public final class WitnessResolutionChecker implements Plugin {
+@SupportedAnnotationTypes("*")
+@SupportedSourceVersion(SourceVersion.RELEASE_25)
+public final class WitnessResolutionChecker extends AbstractProcessor {
   private static final Method WITNESS_METHOD;
 
   static {
@@ -42,27 +46,12 @@ public final class WitnessResolutionChecker implements Plugin {
   }
 
   @Override
-  public String getName() {
-    return "WitnessResolutionChecker";
-  }
-
-  @Override
-  public void init(JavacTask task, String... args) {
-    task.addTaskListener(
-        new TaskListener() {
-          @Override
-          public void finished(TaskEvent e) {
-            if (e.getKind() != TaskEvent.Kind.ANALYZE) {
-              return;
-            }
-
-            if (e.getCompilationUnit() == null) {
-              return;
-            }
-
-            new WitnessCallScanner(Trees.instance(task)).scan(e.getCompilationUnit(), null);
-          }
-        });
+  public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+    for (Element rootElement : roundEnv.getRootElements()) {
+      TreePath path = Trees.instance(processingEnv).getPath(rootElement);
+      new WitnessCallScanner(Trees.instance(processingEnv)).scan(path, null);
+    }
+    return false;
   }
 
   /** Scanner that finds calls to TypeClasses.witness() and validates them. */
@@ -127,7 +116,7 @@ interface Parser<T, R> {
     return flatMap(filtering(predicate));
   }
 
-  default Parser<T, R> guard(Parser<R, ?> predicate) {
+  default <P> Parser<T, R> guard(Parser<R, P> predicate) {
     return (trees, current, input) ->
         this.parse(trees, current, input)
             .flatMap(r -> predicate.parse(trees, current, r).map(x -> r));
