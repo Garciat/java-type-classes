@@ -4,7 +4,6 @@ import static com.garciat.typeclasses.types.Unit.unit;
 
 import com.garciat.typeclasses.TypeClasses;
 import com.garciat.typeclasses.api.Ty;
-import com.garciat.typeclasses.processor.WitnessResolution.InstantiationPlan;
 import com.garciat.typeclasses.types.Unit;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.util.*;
@@ -43,11 +42,12 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
     this.trees = Trees.instance(processingEnv);
-    
+
     // Get the JavacTask and Context for AST rewriting
-    if (processingEnv instanceof com.sun.tools.javac.processing.JavacProcessingEnvironment javacEnv) {
+    if (processingEnv
+        instanceof com.sun.tools.javac.processing.JavacProcessingEnvironment javacEnv) {
       this.context = javacEnv.getContext();
-      
+
       // Try to get JavacTask from the context using different approaches
       try {
         // First try: Get BasicJavacTask directly
@@ -56,7 +56,8 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
           task.addTaskListener(new AstTransformListener());
         } else {
           // Second try: Get JavacTaskImpl
-          com.sun.tools.javac.api.JavacTaskImpl taskImpl = context.get(com.sun.tools.javac.api.JavacTaskImpl.class);
+          com.sun.tools.javac.api.JavacTaskImpl taskImpl =
+              context.get(com.sun.tools.javac.api.JavacTaskImpl.class);
           if (taskImpl != null) {
             taskImpl.addTaskListener(new AstTransformListener());
           }
@@ -75,14 +76,13 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
     return false;
   }
 
-  /**
-   * TaskListener that runs after ANALYZE phase to perform AST transformations.
-   */
+  /** TaskListener that runs during compilation to perform AST transformations. */
   private class AstTransformListener implements TaskListener {
     @Override
     public void finished(TaskEvent e) {
-      if (e.getKind() == TaskEvent.Kind.ANALYZE) {
-        // Perform AST transformation after type attribution is complete
+      // Try both ENTER and ANALYZE phases
+      if (e.getKind() == TaskEvent.Kind.ENTER || e.getKind() == TaskEvent.Kind.ANALYZE) {
+        // Perform AST transformation
         if (e.getCompilationUnit() != null && context != null) {
           JCTree.JCCompilationUnit cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
           cu.accept(new WitnessCallTranslator(context, trees));
@@ -139,9 +139,7 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
       return super.visitMethodInvocation(node, arg);
     }
 
-    /**
-     * Validates parameterless witness() calls.
-     */
+    /** Validates parameterless witness() calls. */
     private void handleParameterlessWitnessCall(MethodInvocationTree node) {
       TreeParser.<MethodInvocationTree>identity()
           .guard(
@@ -178,9 +176,7 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
     }
   }
 
-  /**
-   * Tree translator that rewrites parameterless witness() calls.
-   */
+  /** Tree translator that rewrites parameterless witness() calls. */
   private static class WitnessCallTranslator extends TreeTranslator {
     private final AstRewriter astRewriter;
     private final StaticWitnessSystem system;
@@ -198,15 +194,15 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
       tree.meth = translate(tree.meth);
       tree.args = translate(tree.args);
       tree.typeargs = translate(tree.typeargs);
-      
+
       // Now check if this is a call to the parameterless witness() method
       if (tree.meth instanceof JCTree.JCFieldAccess fieldAccess) {
         if (fieldAccess.sym instanceof Symbol.MethodSymbol methodSymbol) {
           // Check if it matches our parameterless witness method
-          if (methodSymbol.getSimpleName().toString().equals("witness") 
+          if (methodSymbol.getSimpleName().toString().equals("witness")
               && methodSymbol.params().isEmpty()
               && methodSymbol.owner.toString().equals(TypeClasses.class.getName())) {
-            
+
             // This is a parameterless witness() call - try to rewrite it
             if (tree.type != null) {
               var parsedType = system.parse(tree.type);
@@ -224,7 +220,7 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
           }
         }
       }
-      
+
       // If we didn't replace it, keep the original
       if (result == null) {
         result = tree;

@@ -6,9 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.garciat.typeclasses.testclasses.TestShow;
 import org.junit.jupiter.api.Test;
 
-/**
- * Test cases for parameterless witness() calls that should be rewritten by the compiler.
- */
+/** Test cases for parameterless witness() calls that should be rewritten by the compiler. */
 final class ParameterlessWitnessTest {
 
   @Test
