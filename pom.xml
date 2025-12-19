@@ -14,6 +14,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Note: Using source/target instead of release because add-exports is incompatible with release.
+             This is necessary for accessing compiler internals (TreeMaker, JCTree) for AST rewriting. -->
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
     </properties>

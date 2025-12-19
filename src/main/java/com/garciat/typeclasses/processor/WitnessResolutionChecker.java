@@ -60,10 +60,18 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
               context.get(com.sun.tools.javac.api.JavacTaskImpl.class);
           if (taskImpl != null) {
             taskImpl.addTaskListener(new AstTransformListener());
+          } else {
+            // Note: AST rewriting will not work if TaskListener cannot be registered
+            System.err.println(
+                "Warning: Could not register TaskListener for AST rewriting. "
+                    + "Parameterless witness() calls will not be rewritten.");
           }
         }
       } catch (Exception e) {
-        // Silent failure - AST rewriting won't work but validation will still happen
+        // Log the error for debugging
+        System.err.println(
+            "Warning: Failed to register TaskListener for AST rewriting: " + e.getMessage());
+        System.err.println("Parameterless witness() calls will not be rewritten.");
       }
     }
   }
@@ -208,7 +216,11 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
               var parsedType = system.parse(tree.type);
               WitnessResolution.resolve(system, parsedType)
                   .fold(
-                      error -> null, // Validation phase already reported the error
+                      error -> {
+                        // Validation phase already reported the error, keep original tree
+                        result = tree;
+                        return null;
+                      },
                       plan -> {
                         // Build the replacement expression
                         JCTree.JCExpression replacement = astRewriter.buildWitnessExpression(plan);
@@ -216,15 +228,14 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
                         result = replacement;
                         return null;
                       });
+              return; // Exit early after processing
             }
           }
         }
       }
 
-      // If we didn't replace it, keep the original
-      if (result == null) {
-        result = tree;
-      }
+      // If we didn't match or replace, keep the translated original
+      result = tree;
     }
   }
 }
