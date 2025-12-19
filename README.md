@@ -6,7 +6,7 @@
 
 Type classes are a powerful abstraction mechanism popularized by Haskell.
 
-This implements type class resolution for Java, allowing you to define
+This library implements type class resolution for Java, allowing you to define
 type classes and their instances (witnesses) in a modular fashion, and summon
 them automatically at runtime.
 
@@ -34,9 +34,6 @@ Where:
   with `@TypeClass.Witness`.
 - For a witness constructor `C<T> ctor(D1, D2, ..., Dn)`, the witness
   dependencies `D1, D2, ..., Dn` are resolved recursively.
-- Overlapping instances behavior per
-  [this spec](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/instances.html#overlapping-instances),
-  except for the incoherent instances part.
 - Resolution fails when multiple witness constructors exist for a witness type,
   after applying overlapping instances reduction.
 - Resolution fails when a witness constructor for a witness type cannot be
@@ -83,7 +80,7 @@ public interface Show<T> {
 // Custom type
 record Pair<A, B>(A first, B second) {
   @TypeClass.Witness
-  static <A, B> Show<Pair<A, B>> pairShow(Show<A> showA, Show<B> showB) {
+  public static <A, B> Show<Pair<A, B>> pairShow(Show<A> showA, Show<B> showB) {
     return pair -> "(" + showA.show(pair.first()) + ", " + showB.show(pair.second()) + ")";
   }
 }
@@ -106,6 +103,7 @@ class Example {
 - Support for higher-kinded type classes like `Functor<F<_>>`, `Monad<M<_>>`, etc.
   - See the `api.hkt` package for details.
 - Support for overlapping instances _a la_ Haskell.
+  - Based on [this GHC spec](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/instances.html#overlapping-instances).
 
 ## Future work
 
