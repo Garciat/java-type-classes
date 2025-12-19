@@ -48,8 +48,8 @@ public sealed interface FwdList<A> extends TApp<FwdList.Tag, A> {
   }
 
   default void forEach(Consumer<A> action) {
-    this.<Unit>match(
-        () -> unit(),
+    this.match(
+        Unit::unit,
         (head, tail) -> {
           action.accept(head);
           tail.forEach(action);
@@ -119,11 +119,11 @@ public sealed interface FwdList<A> extends TApp<FwdList.Tag, A> {
     return result.fold(FwdList::of, pair -> cons(pair.fst(), unfoldr(pair.snd(), f)));
   }
 
-  public static <A> FwdList<A> build(Builder<A> builder) {
+  static <A> FwdList<A> build(Builder<A> builder) {
     return builder.apply(FwdList::cons, FwdList::of);
   }
 
-  public interface Builder<A> {
+  interface Builder<A> {
     <B> B apply(BiFunction<A, B, B> cons, Supplier<B> nil);
   }
 

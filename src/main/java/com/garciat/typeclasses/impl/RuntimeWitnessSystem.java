@@ -30,9 +30,7 @@ public class RuntimeWitnessSystem {
           Arrays.stream(java.getDeclaredMethods())
               .flatMap(m -> parseWitnessConstructor(m).stream())
               .toList();
-      case Var(var ignore) -> List.of();
-      case ArrayOf(var ignore) -> List.of();
-      case Primitive(var ignore) -> List.of();
+      case Var(_), ArrayOf(_), Primitive(_) -> List.of();
     };
   }
 
@@ -76,8 +74,7 @@ public class RuntimeWitnessSystem {
   private Maybe<Class<?>> parseTagType(Class<?> c) {
     return switch (c.getEnclosingClass()) {
       case Class<?> enclosing when c.getSuperclass().equals(TagBase.class) -> Maybe.just(enclosing);
-      case null -> Maybe.nothing();
-      default -> Maybe.nothing();
+      case null, default -> Maybe.nothing();
     };
   }
 

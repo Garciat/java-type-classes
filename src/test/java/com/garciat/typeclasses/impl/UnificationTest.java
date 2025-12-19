@@ -194,7 +194,7 @@ final class UnificationTest {
   }
 
   // Helper to get a type variable for testing
-  private TypeVariable<?> getTypeVariable() throws Exception {
+  private TypeVariable<?> getTypeVariable() {
     class TestClass<T> {}
     return TestClass.class.getTypeParameters()[0];
   }

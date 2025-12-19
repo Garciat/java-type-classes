@@ -16,8 +16,8 @@ public final class Unification {
 
   public static Maybe<Map<Var, ParsedType>> unify(ParsedType t1, ParsedType t2) {
     return switch (Pair.of(t1, t2)) {
-      case Pair(Var var1, Primitive p) -> Maybe.nothing(); // no primitives in generics
-      case Pair(Var var1, var t) -> Maybe.just(Map.of(var1, t));
+      case Pair(Var _, Primitive _) -> Maybe.nothing(); // no primitives in generics
+      case Pair(Var v, var t) -> Maybe.just(Map.of(v, t));
       case Pair(Const const1, Const const2) when const1.equals(const2) -> Maybe.just(Map.of());
       case Pair(App(var fun1, var arg1), App(var fun2, var arg2)) ->
           Maybe.apply(Maps::merge, unify(fun1, fun2), unify(arg1, arg2));

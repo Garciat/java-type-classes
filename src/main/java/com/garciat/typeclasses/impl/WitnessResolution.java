@@ -19,7 +19,7 @@ public final class WitnessResolution {
     return switch (ZeroOneMore.of(matches)) {
       case ZeroOneMore.One(Match(var rule, var requirements)) ->
           Either.traverse(requirements, r -> resolve(system, r))
-              .<InstantiationPlan>map(dependencies -> new InstantiationPlan(rule, dependencies))
+              .map(dependencies -> new InstantiationPlan(rule, dependencies))
               .mapLeft(error -> new ResolutionError.Nested(target, error));
       case ZeroOneMore.Zero() -> Either.left(new ResolutionError.NotFound(target));
       case ZeroOneMore.More(var ambiguousMatches) ->

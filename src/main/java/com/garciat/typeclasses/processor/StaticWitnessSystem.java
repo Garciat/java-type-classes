@@ -36,9 +36,7 @@ public class StaticWitnessSystem {
               .flatMap(isInstanceOf(ExecutableElement.class))
               .flatMap(method -> parseWitnessConstructor(method).stream())
               .toList();
-      case Var(var ignore) -> List.of();
-      case ArrayOf(var ignore) -> List.of();
-      case Primitive(var ignore) -> List.of();
+      case Var(_), ArrayOf(_), Primitive(_) -> List.of();
     };
   }
 
