@@ -64,13 +64,13 @@ public interface Show<T> {
 
   // Witness definitions:
 
-  // "Leaf" witness:
+  // "Leaf" witness with no dependencies:
   @TypeClass.Witness
   static Show<Integer> integerShow() {
     return i -> Integer.toString(i);
   }
 
-  // "Recursive" witness:
+  // Witness with dependencies (constraints):
   @TypeClass.Witness
   static <A> Show<List<A>> listShow(Show<A> showA) {
     return listA -> listA.stream().map(showA::show).collect(Collectors.joining(", ", "[", "]"));
