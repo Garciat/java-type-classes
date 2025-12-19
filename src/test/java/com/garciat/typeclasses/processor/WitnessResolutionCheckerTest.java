@@ -47,7 +47,15 @@ public class WitnessResolutionCheckerTest {
     boolean success = task.call();
 
     // Then
-    assertThat(diagnostics.getDiagnostics()).isEmpty();
+    var unexpectedDiagnostics =
+        diagnostics.getDiagnostics().stream()
+            .filter(
+                d ->
+                    !(d.getKind() == Diagnostic.Kind.WARNING
+                        && d.getMessage(null)
+                            .contains("Could not register TaskListener for AST rewriting")))
+            .toList();
+    assertThat(unexpectedDiagnostics).isEmpty();
     assertThat(success).isTrue();
   }
 }

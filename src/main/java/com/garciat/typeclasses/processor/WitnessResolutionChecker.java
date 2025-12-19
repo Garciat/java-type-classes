@@ -62,16 +62,23 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
             taskImpl.addTaskListener(new AstTransformListener());
           } else {
             // Note: AST rewriting will not work if TaskListener cannot be registered
-            System.err.println(
-                "Warning: Could not register TaskListener for AST rewriting. "
-                    + "Parameterless witness() calls will not be rewritten.");
+            processingEnv
+                .getMessager()
+                .printMessage(
+                    javax.tools.Diagnostic.Kind.WARNING,
+                    "Could not register TaskListener for AST rewriting. "
+                        + "Parameterless witness() calls will not be rewritten.");
           }
         }
       } catch (Exception e) {
         // Log the error for debugging
-        System.err.println(
-            "Warning: Failed to register TaskListener for AST rewriting: " + e.getMessage());
-        System.err.println("Parameterless witness() calls will not be rewritten.");
+        processingEnv
+            .getMessager()
+            .printMessage(
+                javax.tools.Diagnostic.Kind.WARNING,
+                "Failed to register TaskListener for AST rewriting: "
+                    + e.getMessage()
+                    + ". Parameterless witness() calls will not be rewritten.");
       }
     }
   }

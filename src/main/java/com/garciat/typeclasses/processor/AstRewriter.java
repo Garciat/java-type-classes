@@ -80,11 +80,16 @@ final class AstRewriter {
   }
 
   /**
-   * Replaces a tree node in the AST. This is the key operation that performs the rewrite.
+   * Replaces a tree node in the AST by modifying the parent node.
+   *
+   * <p>NOTE: This method is currently not used. AST rewriting is performed via TreeTranslator in
+   * WitnessCallTranslator.visitApply() which sets the 'result' field. This method is kept as an
+   * alternative approach for future reference or if a different rewriting strategy is needed.
    *
    * @param path the tree path to the node to replace
    * @param replacement the new tree to use
    */
+  @SuppressWarnings("unused")
   void replaceTree(TreePath path, JCTree.JCExpression replacement) {
     Tree leaf = path.getLeaf();
     if (!(leaf instanceof JCTree.JCMethodInvocation originalInvocation)) {
