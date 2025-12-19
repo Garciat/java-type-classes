@@ -13,6 +13,7 @@ The core API of this library is:
 
 public class TypeClasses {
   public static <T> T witness(Ty<T> ty);
+  public static <T> T witness();  // Compile-time only
 }
 ```
 
@@ -33,8 +34,30 @@ Where:
   found.
 - Witness summoning is the result of recursively invoking witness constructors
   up their respective dependency trees.
-- `T witness(Ty<T>)` summons a witness of type `T` or fails with a runtime
-  exception of type `TypeClasses.WitnessResolutionException`.
+- `T witness(Ty<T>)` summons a witness of type `T` at runtime or fails with a
+  runtime exception of type `TypeClasses.WitnessResolutionException`.
+- `T witness()` is a compile-time only method that gets rewritten by the compiler
+  plugin into direct witness constructor calls. This avoids the runtime overhead
+  and the `new Ty<>() {}` trick required for type erasure.
+
+## Compiler Plugin
+
+The parameterless `witness()` method requires the Java compiler plugin to be
+enabled. The plugin is automatically enabled when compiling with this library.
+
+Example usage:
+
+```java
+// Runtime resolution with Ty<T> (always works)
+Show<Integer> show1 = witness(new Ty<>() {});
+
+// Compile-time resolution (requires plugin, more efficient)
+Show<Integer> show2 = witness();
+```
+
+The compiler plugin rewrites the parameterless `witness()` call at compile time
+into the appropriate witness constructor invocations, eliminating the need for
+runtime resolution and improving performance.
 
 Now, there are multiple built-in type classes and types in the `classes` and
 `types` packages, respectively. Their usage is **completely optional**. If your
