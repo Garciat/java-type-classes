@@ -2,17 +2,27 @@
 
 [![codecov](https://codecov.io/gh/Garciat/java-type-classes/branch/main/graph/badge.svg)](https://codecov.io/gh/Garciat/java-type-classes)
 
-See: https://garciat.com/posts/java-type-classes/
+## Background
 
-The core API of this library is:
+Type classes are a powerful abstraction mechanism popularized by Haskell.
+
+This implements type class resolution for Java, allowing you to define
+type classes and their instances (witnesses) in a modular fashion, and summon
+them automatically at runtime.
+
+For a tutorial-like explanation, see: https://garciat.com/posts/java-type-classes/
+
+## API
 
 ```java
 @interface TypeClass {
   @interface Witness {}
 }
 
-public class TypeClasses {
-  public static <T> T witness(Ty<T> ty);
+interface Ty<T> {} // witness type token
+
+class TypeClasses {
+  static <T> T witness(Ty<T> ty);
 }
 ```
 
@@ -36,12 +46,71 @@ Where:
 - `T witness(Ty<T>)` summons a witness of type `T` or fails with a runtime
   exception of type `TypeClasses.WitnessResolutionException`.
 
-Now, there are multiple built-in type classes and types in the `classes` and
+There are multiple built-in type classes and types in the `classes` and
 `types` packages, respectively. Their usage is **completely optional**. If your
 code does not refer to any of the types defined there, then witness resolution
 will not take them into account. As mentioned above, the resolution of a witness
 `C<T>` is completely local to the definitions of `C` and `T`.
 
-For examples, check out the
-[ExamplesTest.java](https://github.com/Garciat/java-type-classes/blob/main/src/test/java/com/garciat/typeclasses/ExamplesTest.java)
-file and its respective imports.
+## Example
+
+```java
+// Type class definition
+@TypeClass
+public interface Show<T> {
+  String show(T value);
+
+  // Helper for inference:
+  static <T> String show(Show<T> showT, T value) {
+    return showT.show(value);
+  }
+
+  // Witness definitions:
+
+  // "Leaf" witness:
+  @TypeClass.Witness
+  static Show<Integer> integerShow() {
+    return i -> Integer.toString(i);
+  }
+
+  // "Recursive" witness:
+  @TypeClass.Witness
+  static <T> Show<List<T>> listShow(Show<T> elemShow) {
+    return listA -> listA.stream().map(showA::show).collect(Collectors.joining(", ", "[", "]"));
+  }
+}
+
+// Custom type
+record Pair<A, B>(A first, B second) {
+  @TypeClass.Witness
+  static <A, B> Show<Pair<A, B>> pairShow(Show<A> showA, Show<B> showB) {
+    return pair -> "(" + showA.show(pair.first()) + ", " + showB.show(pair.second()) + ")";
+  }
+}
+
+// Usage
+class Example {
+  void main() {
+    Pair<Integer, List<Integer>> value = new Pair<>(1, List.of(2, 3, 4));
+    
+    // Summon (and use) the Show witness for Pair<Integer, List<Integer>>:
+    String s = Show.show(witness(new Ty<>() {}), value);
+    
+    System.out.println(s); // prints: (1, [2, 3, 4])
+  }
+}
+```
+
+## Other features
+
+- Support for higher-kinded type classes like `Functor<F<_>>`, `Monad<M<_>>`, etc.
+  - See the `api.hkt` package for details.
+- Support for overlapping instances _a la_ Haskell.
+
+## Future work
+
+- Annotation processor:
+  - To verify type class and witness definitions at compile time.
+  - To reify the witness graph at compile time.
+  - To support parameterless `witness()` calls.
+- Caching of summoned witnesses.
