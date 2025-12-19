@@ -108,7 +108,7 @@ class Example {
 ## Future work
 
 - Annotation processor:
-  - To verify type class and witness definitions at compile time.
+  - To verify witness resolution at compile time.
   - To reify the witness graph at compile time.
   - To support parameterless `witness()` calls.
 - Caching of summoned witnesses.
