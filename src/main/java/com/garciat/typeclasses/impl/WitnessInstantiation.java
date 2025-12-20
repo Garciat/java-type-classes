@@ -11,19 +11,19 @@ public final class WitnessInstantiation {
   public static Expr compile(Rose<WitnessConstructor> plan) {
     return switch (plan) {
       case Rose.Node(var constructor, var dependencies) ->
-          new Expr.InvokeConstructor(
+          new Expr.InvokeStaticMethod(
               constructor.java(),
               dependencies.stream().map(WitnessInstantiation::compile).toList());
     };
   }
 
   public sealed interface Expr {
-    record InvokeConstructor(Method method, List<Expr> arguments) implements Expr {}
+    record InvokeStaticMethod(Method method, List<Expr> arguments) implements Expr {}
   }
 
   public static Either<InstantiationError, Object> interpret(Expr expr) {
     return switch (expr) {
-      case Expr.InvokeConstructor(Method method, List<Expr> args) ->
+      case Expr.InvokeStaticMethod(Method method, List<Expr> args) ->
           Either.traverse(args, WitnessInstantiation::interpret)
               .flatMap(
                   argValues ->
