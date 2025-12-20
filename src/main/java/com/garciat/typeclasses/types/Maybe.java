@@ -1,13 +1,12 @@
 package com.garciat.typeclasses.types;
 
 import com.garciat.typeclasses.api.TypeClass.Witness;
-import com.garciat.typeclasses.api.hkt.Kind.KArr;
-import com.garciat.typeclasses.api.hkt.Kind.KStar;
 import com.garciat.typeclasses.api.hkt.TApp;
 import com.garciat.typeclasses.api.hkt.TagBase;
 import com.garciat.typeclasses.classes.Applicative;
 import com.garciat.typeclasses.classes.Functor;
 import com.garciat.typeclasses.classes.Monad;
+import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -58,6 +57,10 @@ public sealed interface Maybe<A> extends TApp<Maybe.Tag, A> {
 
   static <A, B, C> Maybe<C> apply(BiFunction<A, B, C> f, Maybe<A> ma, Maybe<B> mb) {
     return lift(f).apply(ma, mb);
+  }
+
+  static <A, B> List<B> mapMaybe(List<A> as, Function<A, Maybe<B>> f) {
+    return as.stream().map(f).flatMap(Maybe::stream).toList();
   }
 
   @Witness

@@ -1,6 +1,6 @@
 package com.garciat.typeclasses.impl;
 
-import com.garciat.typeclasses.impl.WitnessResolution.InstantiationPlan;
+import com.garciat.typeclasses.impl.utils.Rose;
 import com.garciat.typeclasses.types.Either;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -8,10 +8,13 @@ import java.util.List;
 public final class WitnessInstantiation {
   private WitnessInstantiation() {}
 
-  public static Expr compile(InstantiationPlan plan) {
-    return new Expr.InvokeConstructor(
-        plan.target().java(),
-        plan.dependencies().stream().map(WitnessInstantiation::compile).toList());
+  public static Expr compile(Rose<WitnessConstructor> plan) {
+    return switch (plan) {
+      case Rose.Node(var constructor, var dependencies) ->
+          new Expr.InvokeConstructor(
+              constructor.java(),
+              dependencies.stream().map(WitnessInstantiation::compile).toList());
+    };
   }
 
   public sealed interface Expr {

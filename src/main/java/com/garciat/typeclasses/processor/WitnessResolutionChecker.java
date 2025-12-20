@@ -78,7 +78,7 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
                                 "Failed to resolve witness for type: "
                                     + witnessType
                                     + "\nReason: "
-                                    + error.format(),
+                                    + WitnessResolution.format(error),
                                 getCurrentPath().getLeaf(),
                                 getCurrentPath().getCompilationUnit());
                             return unit();

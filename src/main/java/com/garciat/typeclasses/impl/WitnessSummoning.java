@@ -10,21 +10,24 @@ public final class WitnessSummoning {
     RuntimeWitnessSystem system = new RuntimeWitnessSystem();
 
     return WitnessResolution.resolve(system, system.parse(target))
-        .<SummonError>mapLeft(SummonError.Resolution::new)
+        .<SummonError>mapLeft(SummonError.ResolutionError::new)
         .map(WitnessInstantiation::compile)
         .flatMap(
-            expr -> WitnessInstantiation.interpret(expr).mapLeft(SummonError.Instantiation::new));
+            expr ->
+                WitnessInstantiation.interpret(expr).mapLeft(SummonError.InstantiationError::new));
   }
 
   public sealed interface SummonError {
-    record Resolution(WitnessResolution.ResolutionError error) implements SummonError {}
+    record ResolutionError(Resolution.Failure<ParsedType, WitnessConstructor> error)
+        implements SummonError {}
 
-    record Instantiation(WitnessInstantiation.InstantiationError error) implements SummonError {}
+    record InstantiationError(WitnessInstantiation.InstantiationError error)
+        implements SummonError {}
 
     default String format() {
       return switch (this) {
-        case Resolution(WitnessResolution.ResolutionError error) -> error.format();
-        case Instantiation(WitnessInstantiation.InstantiationError error) -> error.format();
+        case ResolutionError(var error) -> WitnessResolution.format(error);
+        case InstantiationError(var error) -> error.format();
       };
     }
   }
