@@ -1,7 +1,6 @@
 package com.garciat.typeclasses.impl;
 
 import com.garciat.typeclasses.impl.utils.Formatter;
-import com.garciat.typeclasses.impl.utils.Rose;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
 import com.garciat.typeclasses.types.Either;
 import com.garciat.typeclasses.types.Maybe;
@@ -14,8 +13,11 @@ import java.util.stream.Collectors;
 public final class Resolution {
   private Resolution() {}
 
-  public static <T, C> Either<Failure<T, C>, Rose<C>> resolve(
-      Function<T, List<C>> next, BiFunction<T, C, Maybe<List<T>>> deps, T target) {
+  public static <T, C, R> Either<Failure<T, C>, R> resolve(
+      Function<T, List<C>> next,
+      BiFunction<T, C, Maybe<List<T>>> deps,
+      BiFunction<C, List<R>, R> build,
+      T target) {
     List<C> options = next.apply(target);
 
     return switch (ZeroOneMore.of(Maybe.mapMaybe(options, matching(deps, target)))) {
@@ -23,8 +25,8 @@ public final class Resolution {
       case ZeroOneMore.More(var matches) ->
           Either.left(new Ambiguous<>(target, matches.stream().map(Pair::fst).toList()));
       case ZeroOneMore.One(Pair(var c, var ts)) ->
-          Either.traverse(ts, t -> resolve(next, deps, t))
-              .map(children -> Rose.of(c, children))
+          Either.traverse(ts, t -> resolve(next, deps, build, t))
+              .map(children -> build.apply(c, children))
               .mapLeft(f -> new Nested<>(target, f));
     };
   }

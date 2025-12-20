@@ -14,7 +14,6 @@ import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.Resolution;
 import com.garciat.typeclasses.impl.Unification;
 import com.garciat.typeclasses.impl.utils.Lists;
-import com.garciat.typeclasses.impl.utils.Rose;
 import com.garciat.typeclasses.types.Either;
 import com.garciat.typeclasses.types.Maybe;
 import com.garciat.typeclasses.types.Pair;
@@ -27,21 +26,25 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BiFunction;
 
 public final class RuntimeWitnessSystem {
   private RuntimeWitnessSystem() {}
 
-  public static Either<
-          Resolution.Failure<
-              ParsedType<TypeVariable<?>, Class<?>, Class<?>>, RuntimeWitnessConstructor>,
-          Rose<RuntimeWitnessConstructor>>
-      resolve(Type type) {
+  public static <R>
+      Either<
+              Resolution.Failure<
+                  ParsedType<TypeVariable<?>, Class<?>, Class<?>>, RuntimeWitnessConstructor>,
+              R>
+          resolve(Type type, BiFunction<RuntimeWitnessConstructor, List<R>, R> build) {
+    ParsedType<TypeVariable<?>, Class<?>, Class<?>> target = parse(type);
     return Resolution.resolve(
         t -> OverlappingInstances.reduce(findRules(t)),
         (t, c) ->
             Unification.unify(c.returnType(), t)
                 .map(map -> Unification.substituteAll(map, c.paramTypes())),
-        parse(type));
+        build,
+        target);
   }
 
   private static List<RuntimeWitnessConstructor> findRules(

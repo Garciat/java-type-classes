@@ -43,12 +43,14 @@ public final class StaticWitnessSystem {
               ParsedType<TypeVariable, TypeElement, PrimitiveType>, StaticWitnessConstructor>,
           Rose<StaticWitnessConstructor>>
       resolve(TypeMirror target) {
+    ParsedType<TypeVariable, TypeElement, PrimitiveType> target1 = parse(target);
     return Resolution.resolve(
         t -> OverlappingInstances.reduce(findRules(t)),
         (t, c) ->
             Unification.unify(c.returnType(), t)
                 .map(map -> Unification.substituteAll(map, c.paramTypes())),
-        parse(target));
+        Rose::of,
+        target1);
   }
 
   private static List<StaticWitnessConstructor> findRules(
