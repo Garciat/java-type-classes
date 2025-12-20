@@ -47,11 +47,9 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
   /** Scanner that finds calls to TypeClasses.witness() and validates them. */
   private static class WitnessCallScanner extends TreePathScanner<Void, Void> {
     private final Trees trees;
-    private final StaticWitnessSystem system;
 
     private WitnessCallScanner(Trees trees) {
       this.trees = trees;
-      this.system = new StaticWitnessSystem();
     }
 
     @Override
@@ -70,7 +68,7 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
           .fold(
               Unit::unit,
               witnessType ->
-                  WitnessResolution.resolve(system, system.parse(witnessType))
+                  StaticWitnessSystem.resolve(witnessType)
                       .fold(
                           error -> {
                             this.trees.printMessage(
@@ -78,7 +76,7 @@ public final class WitnessResolutionChecker extends AbstractProcessor {
                                 "Failed to resolve witness for type: "
                                     + witnessType
                                     + "\nReason: "
-                                    + WitnessResolution.format(error),
+                                    + StaticWitnessSystem.format(error),
                                 getCurrentPath().getLeaf(),
                                 getCurrentPath().getCompilationUnit());
                             return unit();

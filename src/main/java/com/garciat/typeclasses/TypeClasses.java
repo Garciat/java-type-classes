@@ -3,19 +3,19 @@ package com.garciat.typeclasses;
 import com.garciat.typeclasses.api.Ty;
 import com.garciat.typeclasses.impl.*;
 import com.garciat.typeclasses.impl.utils.Rose;
+import com.garciat.typeclasses.runtime.RuntimeWitnessConstructor;
+import com.garciat.typeclasses.runtime.RuntimeWitnessSystem;
 import com.garciat.typeclasses.types.Either;
 
 public final class TypeClasses {
   private TypeClasses() {}
 
   public static <T> T witness(Ty<T> ty) {
-    RuntimeWitnessSystem system = new RuntimeWitnessSystem();
-
-    Rose<WitnessConstructor> plan =
-        switch (WitnessResolution.resolve(system, system.parse(ty.type()))) {
+    Rose<RuntimeWitnessConstructor> plan =
+        switch (RuntimeWitnessSystem.resolve(ty.type())) {
           case Either.Right(var r) -> r;
           case Either.Left(var error) ->
-              throw new WitnessResolutionException(WitnessResolution.format(error));
+              throw new WitnessResolutionException(RuntimeWitnessSystem.format(error));
         };
 
     WitnessInstantiation.Expr expr = WitnessInstantiation.compile(plan);

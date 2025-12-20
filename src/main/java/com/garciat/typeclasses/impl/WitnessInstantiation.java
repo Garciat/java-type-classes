@@ -1,6 +1,7 @@
 package com.garciat.typeclasses.impl;
 
 import com.garciat.typeclasses.impl.utils.Rose;
+import com.garciat.typeclasses.runtime.RuntimeWitnessConstructor;
 import com.garciat.typeclasses.types.Either;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -8,7 +9,7 @@ import java.util.List;
 public final class WitnessInstantiation {
   private WitnessInstantiation() {}
 
-  public static Expr compile(Rose<WitnessConstructor> plan) {
+  public static Expr compile(Rose<RuntimeWitnessConstructor> plan) {
     return switch (plan) {
       case Rose.Node(var constructor, var dependencies) ->
           new Expr.InvokeStaticMethod(

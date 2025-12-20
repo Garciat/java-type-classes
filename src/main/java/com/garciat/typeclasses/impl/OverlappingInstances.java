@@ -13,7 +13,8 @@ public final class OverlappingInstances {
    *     "https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/instances.html#overlapping-instances">6.8.8.5.
    *     Overlapping instances</a>
    */
-  public static List<WitnessConstructor> reduce(List<WitnessConstructor> candidates) {
+  public static <W extends WitnessConstructor<V, C, P>, V, C, P> List<W> reduce(
+      List<W> candidates) {
     return candidates.stream()
         .filter(
             iX ->
@@ -21,14 +22,15 @@ public final class OverlappingInstances {
         .toList();
   }
 
-  private static boolean isOverlappedBy(WitnessConstructor iX, WitnessConstructor iY) {
+  private static <W extends WitnessConstructor<V, C, P>, V, C, P> boolean isOverlappedBy(
+      W iX, W iY) {
     return (iX.overlap() == OVERLAPPABLE || iY.overlap() == OVERLAPPING)
         && isSubstitutionInstance(iX, iY)
         && !isSubstitutionInstance(iY, iX);
   }
 
-  private static boolean isSubstitutionInstance(
-      WitnessConstructor base, WitnessConstructor reference) {
+  private static <W extends WitnessConstructor<V, C, P>, V, C, P> boolean isSubstitutionInstance(
+      W base, W reference) {
     return Unification.unify(base.returnType(), reference.returnType())
         .fold(() -> false, map -> !map.isEmpty());
   }
