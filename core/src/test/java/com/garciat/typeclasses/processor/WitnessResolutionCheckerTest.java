@@ -12,14 +12,16 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class WitnessResolutionCheckerTest {
   @Nullable @TempDir Path tempDir;
 
-  @Test
-  public void test() throws IOException {
+  @ParameterizedTest
+  @ValueSource(strings = {"Example1.java"})
+  public void checkExample(String fileName) throws IOException {
     requireNonNull(tempDir);
 
     // Given
@@ -32,7 +34,7 @@ public class WitnessResolutionCheckerTest {
     fileManager.setLocation(StandardLocation.SOURCE_OUTPUT, List.of(tempDir.toFile()));
 
     var files = new java.util.ArrayList<File>();
-    files.add(new File("src/test/java/com/garciat/typeclasses/processor/examples/Example1.java"));
+    files.add(new File("src/test/java/com/garciat/typeclasses/processor/examples/" + fileName));
 
     var compilationUnits = fileManager.getJavaFileObjectsFromFiles(files);
 
