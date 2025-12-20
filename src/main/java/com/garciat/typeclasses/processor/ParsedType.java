@@ -16,8 +16,8 @@ public sealed interface ParsedType {
 
   record Primitive(PrimitiveType java) implements ParsedType {}
 
-  default String format() {
-    return switch (this) {
+  static String format(ParsedType ty) {
+    return switch (ty) {
       case Var v -> v.java.toString();
       case Const c ->
           c.java().getSimpleName()
@@ -26,8 +26,8 @@ public sealed interface ParsedType {
                   .reduce((a, b) -> a + ", " + b)
                   .map(s -> "[" + s + "]")
                   .orElse("");
-      case App a -> a.fun.format() + "(" + a.arg.format() + ")";
-      case ArrayOf a -> a.elementType.format() + "[]";
+      case App a -> ParsedType.format(a.fun()) + "(" + ParsedType.format(a.arg()) + ")";
+      case ArrayOf a -> ParsedType.format(a.elementType()) + "[]";
       case Primitive p -> p.java().toString();
     };
   }

@@ -10,15 +10,17 @@ import java.util.stream.Collectors;
 
 public record WitnessConstructor(
     Method java, Witness.Overlap overlap, List<ParsedType> paramTypes, ParsedType returnType) {
-  public String format() {
+  public static String format(WitnessConstructor wc) {
     return String.format(
         "%s%s -> %s",
-        Arrays.stream(java.getTypeParameters())
+        Arrays.stream(wc.java().getTypeParameters())
             .map(TypeVariable::getName)
             .reduce((a, b) -> a + " " + b)
             .map("∀ %s. "::formatted)
             .orElse(""),
-        paramTypes.stream().map(ParsedType::format).collect(Collectors.joining(", ", "(", ")")),
-        returnType.format());
+        wc.paramTypes().stream()
+            .map(ParsedType::format)
+            .collect(Collectors.joining(", ", "(", ")")),
+        ParsedType.format(wc.returnType()));
   }
 }

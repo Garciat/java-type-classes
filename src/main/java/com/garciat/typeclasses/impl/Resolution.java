@@ -1,5 +1,6 @@
 package com.garciat.typeclasses.impl;
 
+import com.garciat.typeclasses.impl.utils.Formatter;
 import com.garciat.typeclasses.impl.utils.Rose;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
 import com.garciat.typeclasses.types.Either;
@@ -8,6 +9,7 @@ import com.garciat.typeclasses.types.Pair;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class Resolution {
   private Resolution() {}
@@ -30,6 +32,23 @@ public final class Resolution {
   private static <T, C> Function<C, Maybe<Pair<C, List<T>>>> matching(
       BiFunction<T, C, Maybe<List<T>>> deps, T t) {
     return c -> deps.apply(t, c).map(ts -> new Pair<>(c, ts));
+  }
+
+  public static <T, C> String format(
+      Formatter<T> formatT, Formatter<C> formatC, Failure<T, C> error) {
+    return switch (error) {
+      case NotFound(T target) -> "No witness found for type: " + formatT.apply(target);
+      case Ambiguous(T target, List<C> candidates) ->
+          "Ambiguous witnesses found for type: "
+              + formatT.apply(target)
+              + "\nCandidates:\n"
+              + candidates.stream().map(formatC).collect(Collectors.joining("\n")).indent(2);
+      case Nested(T target, Failure<T, C> cause) ->
+          "While resolving witness for type: "
+              + formatT.apply(target)
+              + "\nCaused by: "
+              + format(formatT, formatC, cause).indent(2);
+    };
   }
 
   public sealed interface Failure<T, C> {}
