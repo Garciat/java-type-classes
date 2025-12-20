@@ -12,14 +12,20 @@ them automatically at runtime.
 
 For a tutorial-like explanation, see: https://garciat.com/posts/java-type-classes/
 
+## Installation
+
+Not yet published to Maven Central.
+
 ## API
 
 ```java
 @interface TypeClass {
-  @interface Witness {}
+  @interface Witness {
+  }
 }
 
-interface Ty<T> {} // witness type token
+interface Ty<T> {
+} // witness type token
 
 class TypeClasses {
   static <T> T witness(Ty<T> ty);
@@ -42,12 +48,6 @@ Where:
   up their respective dependency trees.
 - `T witness(Ty<T>)` summons a witness of type `T` or fails with a runtime
   exception of type `TypeClasses.WitnessResolutionException`.
-
-There are multiple built-in type classes and types in the `classes` and
-`types` packages, respectively. Their usage is **completely optional**. If your
-code does not refer to any of the types defined there, then witness resolution
-will not take them into account. As mentioned above, the resolution of a witness
-`C<T>` is completely local to the definitions of `C` and `T`.
 
 ## Example
 
@@ -89,10 +89,11 @@ record Pair<A, B>(A first, B second) {
 class Example {
   void main() {
     Pair<Integer, List<Integer>> value = new Pair<>(1, List.of(2, 3, 4));
-    
+
     // Summon (and use) the Show witness for Pair<Integer, List<Integer>>:
-    String s = Show.show(witness(new Ty<>() {}), value);
-    
+    String s = Show.show(witness(new Ty<>() {
+    }), value);
+
     System.out.println(s); // prints: (1, [2, 3, 4])
   }
 }
@@ -101,14 +102,15 @@ class Example {
 ## Other features
 
 - Support for higher-kinded type classes like `Functor<F<_>>`, `Monad<M<_>>`, etc.
-  - See the `api.hkt` package for details.
+    - See the `api.hkt` package for details.
 - Support for overlapping instances _a la_ Haskell.
-  - Based on [this GHC spec](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/instances.html#overlapping-instances).
+    - Based
+      on [this GHC spec](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/instances.html#overlapping-instances).
 
 ## Future work
 
 - Annotation processor:
-  - To verify witness resolution at compile time.
-  - To reify the witness graph at compile time.
-  - To support parameterless `witness()` calls.
+    - To verify witness resolution at compile time.
+    - To reify the witness graph at compile time.
+    - To support parameterless `witness()` calls.
 - Caching of summoned witnesses.
