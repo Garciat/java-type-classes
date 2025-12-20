@@ -22,8 +22,18 @@ import com.garciat.typeclasses.types.Maybe;
 import com.garciat.typeclasses.types.Pair;
 import java.util.List;
 import java.util.stream.Collectors;
-import javax.lang.model.element.*;
-import javax.lang.model.type.*;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.WildcardType;
 
 public final class StaticWitnessSystem {
   private StaticWitnessSystem() {}

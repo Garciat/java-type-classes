@@ -1,20 +1,19 @@
-package com.garciat.typeclasses.impl;
+package com.garciat.typeclasses.runtime;
 
 import com.garciat.typeclasses.impl.utils.Rose;
-import com.garciat.typeclasses.runtime.RuntimeWitnessConstructor;
 import com.garciat.typeclasses.types.Either;
 import java.lang.reflect.Method;
 import java.util.List;
 
-public final class WitnessInstantiation {
-  private WitnessInstantiation() {}
+public final class RuntimeWitnessInstantiation {
+  private RuntimeWitnessInstantiation() {}
 
   public static Expr compile(Rose<RuntimeWitnessConstructor> plan) {
     return switch (plan) {
       case Rose.Node(var constructor, var dependencies) ->
           new Expr.InvokeStaticMethod(
               constructor.java(),
-              dependencies.stream().map(WitnessInstantiation::compile).toList());
+              dependencies.stream().map(RuntimeWitnessInstantiation::compile).toList());
     };
   }
 
@@ -25,7 +24,7 @@ public final class WitnessInstantiation {
   public static Either<InstantiationError, Object> interpret(Expr expr) {
     return switch (expr) {
       case Expr.InvokeStaticMethod(Method method, List<Expr> args) ->
-          Either.traverse(args, WitnessInstantiation::interpret)
+          Either.traverse(args, RuntimeWitnessInstantiation::interpret)
               .flatMap(
                   argValues ->
                       Either.call(() -> method.invoke(null, argValues.toArray()))

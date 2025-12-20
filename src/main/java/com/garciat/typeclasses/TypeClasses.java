@@ -1,9 +1,9 @@
 package com.garciat.typeclasses;
 
 import com.garciat.typeclasses.api.Ty;
-import com.garciat.typeclasses.impl.*;
 import com.garciat.typeclasses.impl.utils.Rose;
 import com.garciat.typeclasses.runtime.RuntimeWitnessConstructor;
+import com.garciat.typeclasses.runtime.RuntimeWitnessInstantiation;
 import com.garciat.typeclasses.runtime.RuntimeWitnessSystem;
 import com.garciat.typeclasses.types.Either;
 
@@ -18,9 +18,9 @@ public final class TypeClasses {
               throw new WitnessResolutionException(RuntimeWitnessSystem.format(error));
         };
 
-    WitnessInstantiation.Expr expr = WitnessInstantiation.compile(plan);
+    RuntimeWitnessInstantiation.Expr expr = RuntimeWitnessInstantiation.compile(plan);
 
-    return switch (WitnessInstantiation.interpret(expr)) {
+    return switch (RuntimeWitnessInstantiation.interpret(expr)) {
       case Either.Right(var instance) -> {
         @SuppressWarnings("unchecked")
         T typedInstance = (T) instance;
