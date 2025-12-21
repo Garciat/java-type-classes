@@ -24,6 +24,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <scm>
+        <url>https://github.com/Garciat/java-type-classes</url>
+        <connection>scm:git:ssh://git@github.com/Garciat/java-type-classes.git</connection>
+        <tag>HEAD</tag>
+    </scm>
+
     <distributionManagement>
         <snapshotRepository>
             <id>central</id>
