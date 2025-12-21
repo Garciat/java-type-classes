@@ -14,6 +14,8 @@ For a tutorial-like explanation, see: https://garciat.com/posts/java-type-classe
 
 ## Installation
 
+The library is published on Maven Central as [com.garciat.typeclasses/java-type-classes](https://central.sonatype.com/artifact/com.garciat.typeclasses/java-type-classes)
+
 For the core resolution model:
 
 ```xml
