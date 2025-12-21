@@ -14,7 +14,46 @@ For a tutorial-like explanation, see: https://garciat.com/posts/java-type-classe
 
 ## Installation
 
-Not yet published to Maven Central.
+For the core resolution model:
+
+```xml
+<dependency>
+  <groupId>com.garciat.typeclasses</groupId>
+  <artifactId>java-type-classes-core</artifactId>
+  <version>0.1.4</version>
+</dependency>
+```
+
+For some predefined type classes & instances:
+
+```xml
+<dependency>
+  <groupId>com.garciat.typeclasses</groupId>
+  <artifactId>java-type-classes-instances</artifactId>
+  <version>0.1.4</version>
+</dependency>
+```
+
+For the annotation processor:
+
+```xml
+<build>
+  <plugins>
+    <plugin>
+      <artifactId>maven-compiler-plugin</artifactId>
+      <configuration>
+        <annotationProcessorPaths>
+          <path>
+            <groupId>com.garciat.typeclasses</groupId>
+            <artifactId>java-type-classes-core</artifactId>
+            <version>0.1.4</version>
+          </path>
+        </annotationProcessorPaths>
+      </configuration>
+    </plugin>
+  </plugins>
+</build>
+```
 
 ## API
 
@@ -110,7 +149,6 @@ class Example {
 ## Future work
 
 - Annotation processor:
-    - To verify witness resolution at compile time.
     - To reify the witness graph at compile time.
     - To support parameterless `witness()` calls.
 - Caching of summoned witnesses.
