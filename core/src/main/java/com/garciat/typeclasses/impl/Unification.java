@@ -5,6 +5,7 @@ import com.garciat.typeclasses.impl.ParsedType.ArrayOf;
 import com.garciat.typeclasses.impl.ParsedType.Const;
 import com.garciat.typeclasses.impl.ParsedType.Primitive;
 import com.garciat.typeclasses.impl.ParsedType.Var;
+import com.garciat.typeclasses.impl.ParsedType.Wildcard;
 import com.garciat.typeclasses.impl.utils.Maps;
 import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
@@ -38,6 +39,7 @@ public final class Unification {
       case ArrayOf(var elem) -> new ArrayOf<>(substitute(map, elem));
       case Primitive<V, C, P> p -> p;
       case Const<V, C, P> c -> c;
+      case Wildcard<V, C, P> w -> w;
     };
   }
 

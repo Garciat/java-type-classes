@@ -13,6 +13,7 @@ import com.garciat.typeclasses.impl.ParsedType.ArrayOf;
 import com.garciat.typeclasses.impl.ParsedType.Const;
 import com.garciat.typeclasses.impl.ParsedType.Primitive;
 import com.garciat.typeclasses.impl.ParsedType.Var;
+import com.garciat.typeclasses.impl.ParsedType.Wildcard;
 import com.garciat.typeclasses.impl.Resolution;
 import com.garciat.typeclasses.impl.Unification;
 import com.garciat.typeclasses.impl.utils.Either;
@@ -73,7 +74,7 @@ public final class StaticWitnessSystem {
               .flatMap(isInstanceOf(ExecutableElement.class))
               .flatMap(method -> parseWitnessConstructor(method).stream())
               .toList();
-      case Var(_), ArrayOf(_), Primitive(_) -> List.of();
+      case Var(_), ArrayOf(_), Primitive(_), Wildcard() -> List.of();
     };
   }
 
@@ -109,8 +110,7 @@ public final class StaticWitnessSystem {
           dt.getTypeArguments().stream()
               .map(StaticWitnessSystem::parse)
               .reduce(new Const<>(erasure(dt)), App::new);
-      case WildcardType wt ->
-          throw new IllegalArgumentException("Cannot parse wildcard type: " + wt);
+      case WildcardType _ -> new Wildcard<>();
       default -> throw new IllegalArgumentException("Unsupported type: " + type);
     };
   }
@@ -166,6 +166,7 @@ public final class StaticWitnessSystem {
       case App(var fun, var arg) -> format(fun) + "(" + format(arg) + ")";
       case ArrayOf(var elem) -> format(elem) + "[]";
       case Primitive(var prim) -> prim.toString();
+      case Wildcard() -> "?";
     };
   }
 

@@ -11,4 +11,6 @@ public sealed interface ParsedType<V, C, P> {
   record Const<V, C, P>(C java) implements ParsedType<V, C, P> {}
 
   record Primitive<V, C, P>(P java) implements ParsedType<V, C, P> {}
+
+  record Wildcard<V, C, P>() implements ParsedType<V, C, P> {}
 }
