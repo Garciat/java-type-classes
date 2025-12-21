@@ -5,7 +5,7 @@
 
     <groupId>com.garciat.typeclasses</groupId>
     <artifactId>java-type-classes</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>java-type-classes</name>
@@ -25,7 +25,7 @@
     <scm>
         <url>https://github.com/Garciat/java-type-classes</url>
         <connection>scm:git:ssh://git@github.com/Garciat/java-type-classes.git</connection>
-        <tag>java-type-classes-0.1.0</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <distributionManagement>
