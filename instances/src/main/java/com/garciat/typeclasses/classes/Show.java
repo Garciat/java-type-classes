@@ -16,8 +16,43 @@ public interface Show<A> {
   }
 
   @TypeClass.Witness
+  static Show<Boolean> booleanShow() {
+    return b -> Boolean.toString(b);
+  }
+
+  @TypeClass.Witness
+  static Show<Character> charShow() {
+    return c -> "'" + c + "'";
+  }
+
+  @TypeClass.Witness
+  static Show<Byte> byteShow() {
+    return b -> Byte.toString(b);
+  }
+
+  @TypeClass.Witness
+  static Show<Short> shortShow() {
+    return s -> Short.toString(s);
+  }
+
+  @TypeClass.Witness
   static Show<Integer> integerShow() {
     return i -> Integer.toString(i);
+  }
+
+  @TypeClass.Witness
+  static Show<Long> longShow() {
+    return l -> Long.toString(l);
+  }
+
+  @TypeClass.Witness
+  static Show<Float> floatShow() {
+    return f -> Float.toString(f);
+  }
+
+  @TypeClass.Witness
+  static Show<Double> doubleShow() {
+    return d -> Double.toString(d);
   }
 
   @TypeClass.Witness
