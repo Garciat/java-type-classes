@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.garciat.typeclasses</groupId>
         <artifactId>java-type-classes</artifactId>
-        <version>0.1.4</version>
+        <version>0.1.5-SNAPSHOT</version>
     </parent>
 
     <artifactId>java-type-classes-instances</artifactId>
