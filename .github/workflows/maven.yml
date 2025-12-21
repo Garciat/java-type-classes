@@ -17,6 +17,8 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
       - name: Test with Maven
         run: mvn clean verify package
       - name: Upload coverage to Codecov
