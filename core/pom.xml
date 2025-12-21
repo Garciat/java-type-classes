@@ -7,6 +7,7 @@
         <groupId>com.garciat.typeclasses</groupId>
         <artifactId>java-type-classes</artifactId>
         <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>type-classes-core</artifactId>
