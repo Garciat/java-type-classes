@@ -20,7 +20,7 @@ public class WitnessResolutionCheckerTest {
   @Nullable @TempDir Path tempDir;
 
   @ParameterizedTest
-  @ValueSource(strings = {"Example1.java"})
+  @ValueSource(strings = {"Example1.java", "Example2.java"})
   public void checkExample(String fileName) throws IOException {
     requireNonNull(tempDir);
 

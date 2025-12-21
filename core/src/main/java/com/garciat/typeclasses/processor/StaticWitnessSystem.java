@@ -44,19 +44,30 @@ public final class StaticWitnessSystem {
           Rose<StaticWitnessConstructor>>
       resolve(TypeMirror target) {
     ParsedType<TypeVariable, TypeElement, PrimitiveType> target1 = parse(target);
-    return Resolution.resolve(
-        t -> OverlappingInstances.reduce(findRules(t)),
-        (t, c) ->
-            Unification.unify(c.returnType(), t)
-                .map(map -> Unification.substituteAll(map, c.paramTypes())),
+    return Resolution.resolve2(
+        t -> OverlappingInstances.reduce(Maybe.mapMaybe(findWitnesses(t), ctor -> match(ctor, t))),
+        StaticWitnessConstructor::paramTypes,
         Rose::of,
         target1);
   }
 
-  private static List<StaticWitnessConstructor> findRules(
+  // TODO: the ambiguous error displays these replaced constructors, which is not ideal
+  // because the type variables have been substituted. Consider returning the original
+  // constructors along with the substitutions instead.
+  private static Maybe<StaticWitnessConstructor> match(
+      StaticWitnessConstructor ctor, ParsedType<TypeVariable, TypeElement, PrimitiveType> target) {
+    return switch (ctor) {
+      case StaticWitnessConstructor(var method, var overlap, var paramTypes, var returnType) ->
+          Unification.unify(returnType, target)
+              .map(map -> Unification.substituteAll(map, paramTypes))
+              .map(matched -> new StaticWitnessConstructor(method, overlap, matched, returnType));
+    };
+  }
+
+  private static List<StaticWitnessConstructor> findWitnesses(
       ParsedType<TypeVariable, TypeElement, PrimitiveType> target) {
     return switch (target) {
-      case App(var fun, var arg) -> Lists.concat(findRules(fun), findRules(arg));
+      case App(var fun, var arg) -> Lists.concat(findWitnesses(fun), findWitnesses(arg));
       case Const(var java) ->
           java.getEnclosedElements().stream()
               .flatMap(isInstanceOf(ExecutableElement.class))

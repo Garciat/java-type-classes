@@ -31,6 +31,21 @@ public final class Resolution {
     };
   }
 
+  public static <T, C, R> Either<Failure<T, C>, R> resolve2(
+      Function<T, List<C>> candidates,
+      Function<C, List<T>> deps,
+      BiFunction<C, List<R>, R> build,
+      T target) {
+    return switch (ZeroOneMore.of(candidates.apply(target))) {
+      case ZeroOneMore.Zero() -> Either.left(new NotFound<>(target));
+      case ZeroOneMore.More(var matches) -> Either.left(new Ambiguous<>(target, matches));
+      case ZeroOneMore.One(var c) ->
+          Either.traverse(deps.apply(c), t -> resolve2(candidates, deps, build, t))
+              .map(children -> build.apply(c, children))
+              .mapLeft(f -> new Nested<>(target, f));
+    };
+  }
+
   private static <T, C> Function<C, Maybe<Pair<C, List<T>>>> matching(
       BiFunction<T, C, Maybe<List<T>>> deps, T t) {
     return c -> deps.apply(t, c).map(ts -> new Pair<>(c, ts));

@@ -49,8 +49,8 @@ public sealed interface Maybe<A> {
     return (ma, mb) -> ma.flatMap(a -> mb.map(b -> f.apply(a, b)));
   }
 
-  static <A, B, C> Maybe<C> apply(BiFunction<A, B, C> f, Maybe<A> ma, Maybe<B> mb) {
-    return lift(f).apply(ma, mb);
+  static <A, B, C> Maybe<C> apply(BiFunction<A, B, Maybe<C>> f, Maybe<A> ma, Maybe<B> mb) {
+    return ma.flatMap(a -> mb.flatMap(b -> f.apply(a, b)));
   }
 
   static <A, B> List<B> mapMaybe(List<A> as, Function<A, Maybe<B>> f) {
