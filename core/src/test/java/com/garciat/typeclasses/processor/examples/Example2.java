@@ -7,23 +7,21 @@ import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.processor.examples.TList.TCons;
 import com.garciat.typeclasses.processor.examples.TList.TNil;
 
-interface TList<T extends TList.Base<T>> {
-  sealed interface Base<A extends Base<A>> {}
+interface TList<T extends TList<T>> {
+  record TNil() implements TList<TNil> {}
 
-  final class TCons<T, TS extends Base<TS>> implements Base<TCons<T, TS>> {}
-
-  final class TNil implements Base<TNil> {}
+  record TCons<T, TS extends TList<TS>>() implements TList<TCons<T, TS>> {}
 }
 
 @TypeClass
-interface In<TS extends TList.Base<TS>, Y> {
+interface In<TS extends TList<TS>, Y> {
   @TypeClass.Witness
-  static <X, XS extends TList.Base<XS>> In<TCons<X, XS>, X> here() {
+  static <X, XS extends TList<XS>> In<TCons<X, XS>, X> here() {
     return new In<>() {};
   }
 
   @TypeClass.Witness(overlap = TypeClass.Witness.Overlap.OVERLAPPABLE)
-  static <X, XS extends TList.Base<XS>, Y> In<TCons<X, XS>, Y> there(In<XS, Y> there) {
+  static <X, XS extends TList<XS>, Y> In<TCons<X, XS>, Y> there(In<XS, Y> there) {
     return new In<>() {};
   }
 }
