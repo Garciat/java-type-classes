@@ -1,9 +1,8 @@
 package com.garciat.typeclasses.impl;
 
 import com.garciat.typeclasses.impl.utils.Either;
-import com.garciat.typeclasses.impl.utils.Formatter;
+import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
-import com.garciat.typeclasses.impl.utils.Pair;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -13,66 +12,73 @@ import java.util.stream.Collectors;
 public final class Resolution {
   private Resolution() {}
 
-  public static <T, C, R> Either<Failure<T, C>, R> resolve(
-      Function<T, List<C>> next,
-      BiFunction<T, C, Maybe<List<T>>> deps,
-      BiFunction<C, List<R>, R> build,
-      T target) {
-    List<C> options = next.apply(target);
+  public static <M, V, C, P, R> Either<Failure<M, V, C, P>, R> resolve(
+      Function<ParsedType.Const<V, C, P>, List<WitnessConstructor<M, V, C, P>>> constructors,
+      BiFunction<Match<M, V, C, P>, List<R>, R> build,
+      ParsedType<V, C, P> target) {
+    var candidates =
+        OverlappingInstances.reduce(
+            Maybe.mapMaybe(findWitnesses(target, constructors), ctor -> match(ctor, target)));
 
-    return switch (ZeroOneMore.of(Maybe.mapMaybe(options, matching(deps, target)))) {
-      case ZeroOneMore.Zero() -> Either.left(new NotFound<>(target));
-      case ZeroOneMore.More(var matches) ->
-          Either.left(new Ambiguous<>(target, matches.stream().map(Pair::fst).toList()));
-      case ZeroOneMore.One(Pair(var c, var ts)) ->
-          Either.traverse(ts, t -> resolve(next, deps, build, t))
-              .map(children -> build.apply(c, children))
-              .mapLeft(f -> new Nested<>(target, f));
-    };
-  }
-
-  public static <T, C, R> Either<Failure<T, C>, R> resolve2(
-      Function<T, List<C>> candidates,
-      Function<C, List<T>> deps,
-      BiFunction<C, List<R>, R> build,
-      T target) {
-    return switch (ZeroOneMore.of(candidates.apply(target))) {
-      case ZeroOneMore.Zero() -> Either.left(new NotFound<>(target));
-      case ZeroOneMore.More(var matches) -> Either.left(new Ambiguous<>(target, matches));
+    return switch (ZeroOneMore.of(candidates)) {
+      case ZeroOneMore.Zero() -> Either.left(new Failure.NotFound<>(target));
+      case ZeroOneMore.More(var matches) -> Either.left(new Failure.Ambiguous<>(target, matches));
       case ZeroOneMore.One(var c) ->
-          Either.traverse(deps.apply(c), t -> resolve2(candidates, deps, build, t))
+          Either.traverse(c.dependencies(), t -> resolve(constructors, build, t))
               .map(children -> build.apply(c, children))
-              .mapLeft(f -> new Nested<>(target, f));
+              .mapLeft(f -> new Failure.Nested<>(target, f));
     };
   }
 
-  private static <T, C> Function<C, Maybe<Pair<C, List<T>>>> matching(
-      BiFunction<T, C, Maybe<List<T>>> deps, T t) {
-    return c -> deps.apply(t, c).map(ts -> new Pair<>(c, ts));
-  }
-
-  public static <T, C> String format(
-      Formatter<T> formatT, Formatter<C> formatC, Failure<T, C> error) {
-    return switch (error) {
-      case NotFound(T target) -> "No witness found for type: " + formatT.apply(target);
-      case Ambiguous(T target, List<C> candidates) ->
-          "Ambiguous witnesses found for type: "
-              + formatT.apply(target)
-              + "\nCandidates:\n"
-              + candidates.stream().map(formatC).collect(Collectors.joining("\n")).indent(2);
-      case Nested(T target, Failure<T, C> cause) ->
-          "While resolving witness for type: "
-              + formatT.apply(target)
-              + "\nCaused by: "
-              + format(formatT, formatC, cause).indent(2);
+  private static <M, V, C, P> List<WitnessConstructor<M, V, C, P>> findWitnesses(
+      ParsedType<V, C, P> target,
+      Function<ParsedType.Const<V, C, P>, List<WitnessConstructor<M, V, C, P>>> constructors) {
+    return switch (target) {
+      case ParsedType.App(var fun, var arg) ->
+          Lists.concat(findWitnesses(fun, constructors), findWitnesses(arg, constructors));
+      case ParsedType.Const<V, C, P> c -> constructors.apply(c);
+      case ParsedType.Var(_),
+          ParsedType.ArrayOf(_),
+          ParsedType.Primitive(_),
+          ParsedType.Wildcard() ->
+          List.of();
     };
   }
 
-  public sealed interface Failure<T, C> {}
+  private static <M, V, C, P> Maybe<Match<M, V, C, P>> match(
+      WitnessConstructor<M, V, C, P> ctor, ParsedType<V, C, P> target) {
+    return Unification.unify(ctor.returnType(), target)
+        .map(map -> Unification.substituteAll(map, ctor.paramTypes()))
+        .map(dependencies -> new Match<>(ctor, dependencies, target));
+  }
 
-  public record NotFound<T, C>(T target) implements Failure<T, C> {}
+  public sealed interface Failure<M, V, C, P> {
+    record NotFound<M, V, C, P>(ParsedType<V, C, P> target) implements Failure<M, V, C, P> {}
 
-  public record Ambiguous<T, C>(T target, List<C> candidates) implements Failure<T, C> {}
+    record Ambiguous<M, V, C, P>(ParsedType<V, C, P> target, List<Match<M, V, C, P>> candidates)
+        implements Failure<M, V, C, P> {}
 
-  public record Nested<T, C>(T target, Failure<T, C> cause) implements Failure<T, C> {}
+    record Nested<M, V, C, P>(ParsedType<V, C, P> target, Failure<M, V, C, P> cause)
+        implements Failure<M, V, C, P> {}
+
+    default String format() {
+      return switch (this) {
+        case NotFound(var target) -> "No witness found for type: " + target.format();
+        case Ambiguous(var target, var candidates) ->
+            "Ambiguous witnesses found for type: "
+                + target.format()
+                + "\nCandidates:\n"
+                + candidates.stream()
+                    .map(Match::ctor)
+                    .map(WitnessConstructor::format)
+                    .collect(Collectors.joining("\n"))
+                    .indent(2);
+        case Nested(var target, var cause) ->
+            "While resolving witness for type: "
+                + target.format()
+                + "\nCaused by: "
+                + cause.format().indent(2);
+      };
+    }
+  }
 }

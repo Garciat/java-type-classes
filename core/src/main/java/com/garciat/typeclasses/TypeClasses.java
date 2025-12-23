@@ -1,8 +1,9 @@
 package com.garciat.typeclasses;
 
 import com.garciat.typeclasses.api.Ty;
+import com.garciat.typeclasses.impl.Match;
 import com.garciat.typeclasses.impl.utils.Either;
-import com.garciat.typeclasses.runtime.RuntimeWitnessConstructor;
+import com.garciat.typeclasses.runtime.Runtime;
 import com.garciat.typeclasses.runtime.RuntimeWitnessSystem;
 import java.util.List;
 
@@ -13,8 +14,7 @@ public final class TypeClasses {
     Object instance =
         switch (RuntimeWitnessSystem.resolve(ty.type(), TypeClasses::invoke)) {
           case Either.Right(var r) -> r;
-          case Either.Left(var error) ->
-              throw new WitnessResolutionException(RuntimeWitnessSystem.format(error));
+          case Either.Left(var error) -> throw new WitnessResolutionException(error.format());
         };
 
     @SuppressWarnings("unchecked")
@@ -22,9 +22,10 @@ public final class TypeClasses {
     return typedInstance;
   }
 
-  private static Object invoke(RuntimeWitnessConstructor ctor, List<Object> args) {
+  private static Object invoke(
+      Match<Runtime.Method, Runtime.Var, Runtime.Const, Runtime.Prim> match, List<Object> args) {
     try {
-      return ctor.java().invoke(null, args.toArray());
+      return match.ctor().method().java().invoke(null, args.toArray());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

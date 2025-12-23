@@ -6,7 +6,7 @@ import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.api.hkt.TApp;
 import com.garciat.typeclasses.api.hkt.TPar;
 import com.garciat.typeclasses.api.hkt.TagBase;
-import com.garciat.typeclasses.impl.OverlappingInstances;
+import com.garciat.typeclasses.impl.Match;
 import com.garciat.typeclasses.impl.ParsedType;
 import com.garciat.typeclasses.impl.ParsedType.App;
 import com.garciat.typeclasses.impl.ParsedType.ArrayOf;
@@ -15,19 +15,16 @@ import com.garciat.typeclasses.impl.ParsedType.Primitive;
 import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.ParsedType.Wildcard;
 import com.garciat.typeclasses.impl.Resolution;
-import com.garciat.typeclasses.impl.Unification;
+import com.garciat.typeclasses.impl.WitnessConstructor;
 import com.garciat.typeclasses.impl.utils.Either;
-import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
 import com.garciat.typeclasses.impl.utils.Rose;
 import java.util.List;
-import java.util.stream.Collectors;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
+import javax.lang.model.element.Parameterizable;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
@@ -40,52 +37,30 @@ public final class StaticWitnessSystem {
   private StaticWitnessSystem() {}
 
   public static Either<
-          Resolution.Failure<
-              ParsedType<TypeVariable, TypeElement, PrimitiveType>, StaticWitnessConstructor>,
-          Rose<StaticWitnessConstructor>>
+          Resolution.Failure<Static.Method, Static.Var, Static.Const, Static.Prim>,
+          Rose<Match<Static.Method, Static.Var, Static.Const, Static.Prim>>>
       resolve(TypeMirror target) {
-    ParsedType<TypeVariable, TypeElement, PrimitiveType> target1 = parse(target);
-    return Resolution.resolve2(
-        t -> OverlappingInstances.reduce(Maybe.mapMaybe(findWitnesses(t), ctor -> match(ctor, t))),
-        StaticWitnessConstructor::paramTypes,
-        Rose::of,
-        target1);
+    return Resolution.resolve(StaticWitnessSystem::findWitnesses, Rose::of, parse(target));
   }
 
-  // TODO: the ambiguous error displays these replaced constructors, which is not ideal
-  // because the type variables have been substituted. Consider returning the original
-  // constructors along with the substitutions instead.
-  private static Maybe<StaticWitnessConstructor> match(
-      StaticWitnessConstructor ctor, ParsedType<TypeVariable, TypeElement, PrimitiveType> target) {
-    return switch (ctor) {
-      case StaticWitnessConstructor(var method, var overlap, var paramTypes, var returnType) ->
-          Unification.unify(returnType, target)
-              .map(map -> Unification.substituteAll(map, paramTypes))
-              .map(matched -> new StaticWitnessConstructor(method, overlap, matched, returnType));
-    };
+  private static List<WitnessConstructor<Static.Method, Static.Var, Static.Const, Static.Prim>>
+      findWitnesses(ParsedType.Const<Static.Var, Static.Const, Static.Prim> target) {
+    return target.repr().java().getEnclosedElements().stream()
+        .flatMap(isInstanceOf(ExecutableElement.class))
+        .flatMap(method -> parseWitnessConstructor(method).stream())
+        .toList();
   }
 
-  private static List<StaticWitnessConstructor> findWitnesses(
-      ParsedType<TypeVariable, TypeElement, PrimitiveType> target) {
-    return switch (target) {
-      case App(var fun, var arg) -> Lists.concat(findWitnesses(fun), findWitnesses(arg));
-      case Const(var java) ->
-          java.getEnclosedElements().stream()
-              .flatMap(isInstanceOf(ExecutableElement.class))
-              .flatMap(method -> parseWitnessConstructor(method).stream())
-              .toList();
-      case Var(_), ArrayOf(_), Primitive(_), Wildcard() -> List.of();
-    };
-  }
-
-  private static Maybe<StaticWitnessConstructor> parseWitnessConstructor(ExecutableElement method) {
+  private static Maybe<WitnessConstructor<Static.Method, Static.Var, Static.Const, Static.Prim>>
+      parseWitnessConstructor(ExecutableElement method) {
     if (method.getModifiers().contains(Modifier.PUBLIC)
         && method.getModifiers().contains(Modifier.STATIC)
         && method.getAnnotation(TypeClass.Witness.class) instanceof TypeClass.Witness witnessAnn) {
       return Maybe.just(
-          new StaticWitnessConstructor(
-              method,
+          new WitnessConstructor<>(
+              new Static.Method(method),
               witnessAnn.overlap(),
+              typeParams(method),
               method.getParameters().stream()
                   .map(VariableElement::asType)
                   .map(StaticWitnessSystem::parse)
@@ -97,22 +72,35 @@ public final class StaticWitnessSystem {
     }
   }
 
-  private static ParsedType<TypeVariable, TypeElement, PrimitiveType> parse(TypeMirror type) {
+  private static ParsedType<Static.Var, Static.Const, Static.Prim> parse(TypeMirror type) {
     return switch (type) {
-      case TypeVariable tv -> new Var<>(tv);
+      case TypeVariable tv -> new Var<>(new Static.Var(tv));
       case ArrayType at -> new ArrayOf<>(parse(at.getComponentType()));
-      case PrimitiveType pt -> new Primitive<>(pt);
+      case PrimitiveType pt -> new Primitive<>(new Static.Prim(pt));
       case DeclaredType dt when parseTagType(dt) instanceof Maybe.Just(var realType) ->
-          new Const<>(realType);
+          constType(realType);
       case DeclaredType dt when parseAppType(dt) instanceof Maybe.Just(Pair(var fun, var arg)) ->
           new App<>(parse(fun), parse(arg));
       case DeclaredType dt ->
           dt.getTypeArguments().stream()
               .map(StaticWitnessSystem::parse)
-              .reduce(new Const<>(erasure(dt)), App::new);
+              .reduce(constType(erasure(dt)), App::new);
       case WildcardType _ -> new Wildcard<>();
       default -> throw new IllegalArgumentException("Unsupported type: " + type);
     };
+  }
+
+  private static Const<Static.Var, Static.Const, Static.Prim> constType(TypeElement typeElement) {
+    return new Const<>(new Static.Const(typeElement), typeParams(typeElement));
+  }
+
+  private static List<Var<Static.Var, Static.Const, Static.Prim>> typeParams(Parameterizable tp) {
+    return tp.getTypeParameters().stream()
+        .map(
+            tpe ->
+                new Var<Static.Var, Static.Const, Static.Prim>(
+                    new Static.Var((TypeVariable) tpe.asType())))
+        .toList();
   }
 
   private static Maybe<TypeElement> parseTagType(DeclaredType t) {
@@ -129,7 +117,7 @@ public final class StaticWitnessSystem {
 
   private static Maybe<Pair<TypeMirror, TypeMirror>> parseAppType(DeclaredType t) {
     return t.getTypeArguments().size() == 2 && isAppType(erasure(t))
-        ? Maybe.just(new Pair<>(t.getTypeArguments().get(0), t.getTypeArguments().get(1)))
+        ? Maybe.just(Pair.of(t.getTypeArguments().get(0), t.getTypeArguments().get(1)))
         : Maybe.nothing();
   }
 
@@ -144,44 +132,5 @@ public final class StaticWitnessSystem {
     } else {
       throw new IllegalArgumentException("Cannot get erasure of type: " + t);
     }
-  }
-
-  public static String format(
-      Resolution.Failure<
-              ParsedType<TypeVariable, TypeElement, PrimitiveType>, StaticWitnessConstructor>
-          error) {
-    return Resolution.format(StaticWitnessSystem::format, StaticWitnessSystem::format, error);
-  }
-
-  private static String format(ParsedType<TypeVariable, TypeElement, PrimitiveType> ty) {
-    return switch (ty) {
-      case Var(var v) -> v.toString();
-      case Const(var elem) ->
-          elem.getSimpleName()
-              + elem.getTypeParameters().stream()
-                  .map(TypeParameterElement::toString)
-                  .reduce((a, b) -> a + ", " + b)
-                  .map(s -> "[" + s + "]")
-                  .orElse("");
-      case App(var fun, var arg) -> format(fun) + "(" + format(arg) + ")";
-      case ArrayOf(var elem) -> format(elem) + "[]";
-      case Primitive(var prim) -> prim.toString();
-      case Wildcard() -> "?";
-    };
-  }
-
-  private static String format(StaticWitnessConstructor constructor) {
-    return String.format(
-        "%s%s -> %s",
-        constructor.method().getTypeParameters().stream()
-            .map(TypeParameterElement::getSimpleName)
-            .map(Name::toString)
-            .reduce((a, b) -> a + " " + b)
-            .map("∀ %s. "::formatted)
-            .orElse(""),
-        constructor.paramTypes().stream()
-            .map(StaticWitnessSystem::format)
-            .collect(Collectors.joining(", ", "(", ")")),
-        format(constructor.returnType()));
   }
 }

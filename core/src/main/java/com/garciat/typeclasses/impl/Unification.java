@@ -15,18 +15,23 @@ import java.util.Map;
 public final class Unification {
   private Unification() {}
 
+  /**
+   * This is asymmetric: we check if the second type can be made to match the first, but not vice
+   * versa.
+   */
   public static <V, C, P> Maybe<Map<Var<V, C, P>, ParsedType<V, C, P>>> unify(
       ParsedType<V, C, P> t1, ParsedType<V, C, P> t2) {
     return switch (Pair.of(t1, t2)) {
       case Pair(Var(_), Primitive(_)) -> Maybe.nothing(); // no primitives in generics
       case Pair(Var<V, C, P> v, var t) -> Maybe.just(Map.of(v, t));
-      case Pair(Const(var const1), Const(var const2)) when const1.equals(const2) ->
+      case Pair(Const(var repr1, _), Const(var repr2, _)) when repr1.equals(repr2) ->
           Maybe.just(Map.of());
       case Pair(App(var fun1, var arg1), App(var fun2, var arg2)) ->
           Maybe.apply(Maps::merge, unify(fun1, fun2), unify(arg1, arg2));
       case Pair(ArrayOf(var elem1), ArrayOf(var elem2)) -> unify(elem1, elem2);
       case Pair(Primitive(var prim1), Primitive(var prim2)) when prim1.equals(prim2) ->
           Maybe.just(Map.of());
+      case Pair(Wildcard(), _) -> Maybe.just(Map.of());
       default -> Maybe.nothing();
     };
   }
