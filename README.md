@@ -22,7 +22,7 @@ For the core resolution model:
 <dependency>
   <groupId>com.garciat.typeclasses</groupId>
   <artifactId>java-type-classes-core</artifactId>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
 </dependency>
 ```
 
@@ -32,7 +32,7 @@ For some predefined type classes & instances:
 <dependency>
   <groupId>com.garciat.typeclasses</groupId>
   <artifactId>java-type-classes-instances</artifactId>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
 </dependency>
 ```
 
@@ -48,7 +48,7 @@ For the annotation processor:
           <path>
             <groupId>com.garciat.typeclasses</groupId>
             <artifactId>java-type-classes-core</artifactId>
-            <version>0.1.4</version>
+            <version>0.1.5</version>
           </path>
         </annotationProcessorPaths>
       </configuration>
@@ -61,12 +61,10 @@ For the annotation processor:
 
 ```java
 @interface TypeClass {
-  @interface Witness {
-  }
+  @interface Witness {}
 }
 
-interface Ty<T> {
-} // witness type token
+interface Ty<T> {} // witness type token
 
 class TypeClasses {
   static <T> T witness(Ty<T> ty);
@@ -132,8 +130,7 @@ class Example {
     Pair<Integer, List<Integer>> value = new Pair<>(1, List.of(2, 3, 4));
 
     // Summon (and use) the Show witness for Pair<Integer, List<Integer>>:
-    String s = Show.show(witness(new Ty<>() {
-    }), value);
+    String s = Show.show(witness(new Ty<>() {}), value);
 
     System.out.println(s); // prints: (1, [2, 3, 4])
   }
