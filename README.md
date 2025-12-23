@@ -1,6 +1,7 @@
 # Type Class resolution for Java
 
 [![codecov](https://codecov.io/gh/Garciat/java-type-classes/branch/main/graph/badge.svg)](https://codecov.io/gh/Garciat/java-type-classes)
+[![Maven Central Version](https://img.shields.io/maven-central/v/com.garciat.typeclasses/java-type-classes)](https://central.sonatype.com/artifact/com.garciat.typeclasses/java-type-classes)
 
 ## Background
 
