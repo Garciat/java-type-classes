@@ -5,6 +5,7 @@ import com.garciat.typeclasses.impl.Match;
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.runtime.Runtime;
 import com.garciat.typeclasses.runtime.RuntimeWitnessSystem;
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
 public final class TypeClasses {
@@ -26,14 +27,23 @@ public final class TypeClasses {
       Match<Runtime.Method, Runtime.Var, Runtime.Const, Runtime.Prim> match, List<Object> args) {
     try {
       return match.ctor().method().java().invoke(null, args.toArray());
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    } catch (IllegalAccessException e) {
+      throw new IllegalStateException("BUG: expected witness constructor method to be public", e);
+    } catch (InvocationTargetException e) {
+      throw new WitnessResolutionException(
+          "Witness constructor %s threw an exception while resolving %s"
+              .formatted(match.ctor().method(), match.witnessType().format()),
+          e.getTargetException());
     }
   }
 
   public static class WitnessResolutionException extends RuntimeException {
     private WitnessResolutionException(String message) {
       super(message);
+    }
+
+    private WitnessResolutionException(String message, Throwable cause) {
+      super(message, cause);
     }
   }
 }
