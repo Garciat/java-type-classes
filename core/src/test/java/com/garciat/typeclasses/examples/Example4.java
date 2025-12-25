@@ -48,7 +48,7 @@ public class Example4 {
     }
 
     @TypeClass.Witness(overlap = TypeClass.Witness.Overlap.OVERLAPPING)
-    static <A, @Out R> Flatten<List<List<A>>, R> there(Flatten<List<A>, R> e) {
+    static <A, R> Flatten<List<List<A>>, R> there(Flatten<List<A>, R> e) {
       return list -> list.stream().flatMap(innerList -> e.flatten(innerList).stream()).toList();
     }
   }

@@ -10,11 +10,13 @@ import com.garciat.typeclasses.impl.ParsedType.App;
 import com.garciat.typeclasses.impl.ParsedType.ArrayOf;
 import com.garciat.typeclasses.impl.ParsedType.Const;
 import com.garciat.typeclasses.impl.ParsedType.Primitive;
+import com.garciat.typeclasses.impl.ParsedType.TyParam;
 import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.ParsedType.Wildcard;
 import com.garciat.typeclasses.impl.Resolution;
 import com.garciat.typeclasses.impl.WitnessConstructor;
 import com.garciat.typeclasses.impl.utils.Either;
+import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
 import java.lang.reflect.GenericArrayType;
@@ -64,22 +66,37 @@ public final class RuntimeWitnessSystem {
     }
   }
 
-  private static ParsedType<Runtime.Var, Runtime.Const, Runtime.Prim> parse(Type java) {
+  public static ParsedType<Runtime.Var, Runtime.Const, Runtime.Prim> parse(Type java) {
     return switch (java) {
       case Class<?> tag when parseTagType(tag) instanceof Maybe.Just(var tagged) ->
           constType(tagged);
       case Class<?> arr when arr.isArray() -> new ArrayOf<>(parse(arr.getComponentType()));
       case Class<?> prim when prim.isPrimitive() -> new Primitive<>(new Runtime.Prim(prim));
       case Class<?> c -> constType(c);
-      case TypeVariable<?> v -> new Var<>(new Runtime.Var(v), v.isAnnotationPresent(Out.class));
+      case TypeVariable<?> v -> new Var<>(typeParam(v));
       case ParameterizedType p when parseAppType(p) instanceof Maybe.Just(Pair(var fun, var arg)) ->
           new App<>(parse(fun), parse(arg));
       case ParameterizedType p when parseLazyType(p) instanceof Maybe.Just(var under) ->
           new ParsedType.Lazy<>(parse(under));
-      case ParameterizedType p ->
-          Arrays.stream(p.getActualTypeArguments())
-              .map(RuntimeWitnessSystem::parse)
-              .reduce(parse(p.getRawType()), App::new);
+      case ParameterizedType p -> {
+        Const<Runtime.Var, Runtime.Const, Runtime.Prim> decl = constType((Class<?>) p.getRawType());
+
+        List<ParsedType<Runtime.Var, Runtime.Const, Runtime.Prim>> args =
+            Arrays.stream(p.getActualTypeArguments()).map(RuntimeWitnessSystem::parse).toList();
+
+        yield Lists.zip(
+                decl.typeParams(),
+                args,
+                (param, arg) -> {
+                  if (param.isOut()) {
+                    return new ParsedType.Out<>(arg);
+                  } else {
+                    return arg;
+                  }
+                })
+            .stream()
+            .reduce(decl, App::new);
+      }
       case GenericArrayType a -> new ArrayOf<>(parse(a.getGenericComponentType()));
       case WildcardType _ -> new Wildcard<>();
       default -> throw new IllegalArgumentException("Unsupported type: " + java);
@@ -90,12 +107,12 @@ public final class RuntimeWitnessSystem {
     return new Const<>(new Runtime.Const(tagged), typeParams(tagged));
   }
 
-  private static List<Var<Runtime.Var, Runtime.Const, Runtime.Prim>> typeParams(
-      GenericDeclaration cls) {
-    return Arrays.stream(cls.getTypeParameters())
-        .<Var<Runtime.Var, Runtime.Const, Runtime.Prim>>map(
-            t -> new Var<>(new Runtime.Var(t), t.isAnnotationPresent(Out.class)))
-        .toList();
+  private static List<TyParam<Runtime.Var>> typeParams(GenericDeclaration cls) {
+    return Arrays.stream(cls.getTypeParameters()).map(RuntimeWitnessSystem::typeParam).toList();
+  }
+
+  private static TyParam<Runtime.Var> typeParam(TypeVariable<?> t) {
+    return new TyParam<>(new Runtime.Var(t), t.isAnnotationPresent(Out.class));
   }
 
   private static Maybe<Type> parseLazyType(ParameterizedType t) {

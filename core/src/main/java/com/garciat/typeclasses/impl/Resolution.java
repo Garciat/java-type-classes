@@ -1,8 +1,5 @@
 package com.garciat.typeclasses.impl;
 
-import static com.garciat.typeclasses.impl.utils.Sets.difference;
-import static java.util.stream.Collectors.toSet;
-
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
@@ -54,50 +51,21 @@ public final class Resolution {
         OverlappingInstances.reduce(Maybe.mapMaybe(witnesses, ctor -> match(ctor, target)));
 
     return switch (ZeroOneMore.of(candidates)) {
-      case ZeroOneMore.Zero() -> Either.left(new Failure.NotFound<>(target, witnesses));
+      case ZeroOneMore.Zero() -> Either.left(new Failure.NoMatch<>(target, witnesses));
       case ZeroOneMore.More(var matches) -> Either.left(new Failure.Ambiguous<>(target, matches));
       case ZeroOneMore.One(var match) -> {
-        Set<ParsedType.Var<V, C, P>> unboundTypeParams =
-            match.dependencies().stream().flatMap(Free::freeVars).collect(toSet());
-
-        Set<ParsedType.Var<V, C, P>> outTypeParams =
-            unboundTypeParams.stream().filter(ParsedType.Var::isOut).collect(toSet());
-
-        if (!outTypeParams.equals(unboundTypeParams)) {
-          // TODO: Better error reporting
-          var problem = difference(unboundTypeParams, outTypeParams);
-          throw new IllegalStateException(
-              "Cannot resolve witness for type "
-                  + target.format()
-                  + " because constructor "
-                  + match.ctor().format()
-                  + " has unbound non-covariant type parameters: "
-                  + problem.stream()
-                      .map(ParsedType.Var::format)
-                      .collect(Collectors.joining(", ", "[", "]")));
-        }
-
         Map<ParsedType.Var<V, C, P>, ParsedType<V, C, P>> substitution = new HashMap<>();
 
-        for (int i = 0; i < match.dependencies().size(); i++) {
-          var dep = match.dependencies().get(i);
-          var src = match.ctor().paramTypes().get(i);
-
-          if (dep.equals(src)) {
-            // This dependency did not make progress
-            // Trying to resolve it would just fail
-            continue;
-          }
-
-          if (Free.outVars(dep).findAny().isEmpty()) {
-            // This dependency has no free type variables
-            // No need to resolve it
+        for (var dep : match.dependencies()) {
+          if (Outs.findOuts(dep).findAny().isEmpty()) {
+            // This dependency has no out variables; no need to resolve it
             continue;
           }
 
           switch (resolveRec(seen, constructors, dep)) {
             case Either.Right(Result.Node(var possible, _)) -> {
-              switch (Unification.unify(dep, possible.witnessType())) {
+              switch (Unification.unify(
+                  Outs.unwrapOut(dep), Outs.unwrapOut(possible.witnessType()))) {
                 case Maybe.Just(var child) -> substitution.putAll(child);
                 case Maybe.Nothing() ->
                     throw new IllegalStateException(
@@ -125,19 +93,6 @@ public final class Resolution {
                         + ":\n"
                         + error.format().indent(2));
           }
-        }
-
-        if (!substitution.keySet().containsAll(unboundTypeParams)) {
-          var problem = difference(unboundTypeParams, substitution.keySet());
-          throw new IllegalStateException(
-              "Cannot resolve witness for type "
-                  + target.format()
-                  + " because constructor "
-                  + match.ctor().format()
-                  + " has unbound type parameters: "
-                  + problem.stream()
-                      .map(ParsedType.Var::format)
-                      .collect(Collectors.joining(", ", "[", "]")));
         }
 
         List<ParsedType<V, C, P>> resolvedDependencies =
@@ -177,7 +132,8 @@ public final class Resolution {
           Lists.concat(findWitnesses(constructors, fun), findWitnesses(constructors, arg));
       case ParsedType.Const<V, C, P> c -> constructors.apply(c.repr());
       case ParsedType.Lazy(var under) -> findWitnesses(constructors, under);
-      case ParsedType.Var(_, _),
+      case ParsedType.Var(_),
+          ParsedType.Out(_),
           ParsedType.ArrayOf(_),
           ParsedType.Primitive(_),
           ParsedType.Wildcard() ->
@@ -186,7 +142,7 @@ public final class Resolution {
   }
 
   public sealed interface Failure<M, V, C, P> {
-    record NotFound<M, V, C, P>(
+    record NoMatch<M, V, C, P>(
         ParsedType<V, C, P> target, List<WitnessConstructor<M, V, C, P>> witnesses)
         implements Failure<M, V, C, P> {}
 
@@ -198,8 +154,8 @@ public final class Resolution {
 
     default String format() {
       return switch (this) {
-        case NotFound(var target, var candidates) ->
-            "No witnesses found for type: "
+        case NoMatch(var target, var candidates) ->
+            "No matching witnesses found for type: "
                 + target.format()
                 + (candidates.isEmpty()
                     ? "No witnesses available."

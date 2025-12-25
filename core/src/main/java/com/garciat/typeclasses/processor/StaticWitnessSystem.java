@@ -13,6 +13,7 @@ import com.garciat.typeclasses.impl.ParsedType.App;
 import com.garciat.typeclasses.impl.ParsedType.ArrayOf;
 import com.garciat.typeclasses.impl.ParsedType.Const;
 import com.garciat.typeclasses.impl.ParsedType.Primitive;
+import com.garciat.typeclasses.impl.ParsedType.TyParam;
 import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.ParsedType.Wildcard;
 import com.garciat.typeclasses.impl.Resolution;
@@ -26,6 +27,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Parameterizable;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.PrimitiveType;
@@ -71,8 +73,7 @@ public final class StaticWitnessSystem {
 
   private static ParsedType<Static.Var, Static.Const, Static.Prim> parse(TypeMirror type) {
     return switch (type) {
-      case TypeVariable tv ->
-          new Var<>(new Static.Var(tv), tv.asElement().getAnnotation(Out.class) != null);
+      case TypeVariable tv -> new Var<>(typeParam((TypeParameterElement) tv.asElement()));
       case ArrayType at -> new ArrayOf<>(parse(at.getComponentType()));
       case PrimitiveType pt -> new Primitive<>(new Static.Prim(pt));
       case DeclaredType dt when parseTagType(dt) instanceof Maybe.Just(var realType) ->
@@ -81,10 +82,25 @@ public final class StaticWitnessSystem {
           new App<>(parse(fun), parse(arg));
       case DeclaredType dt when parseLazyType(dt) instanceof Maybe.Just(var under) ->
           new ParsedType.Lazy<>(parse(under));
-      case DeclaredType dt ->
-          dt.getTypeArguments().stream()
-              .map(StaticWitnessSystem::parse)
-              .reduce(constType(erasure(dt)), App::new);
+      case DeclaredType dt -> {
+        Const<Static.Var, Static.Const, Static.Prim> decl = constType(erasure(dt));
+
+        List<ParsedType<Static.Var, Static.Const, Static.Prim>> args =
+            dt.getTypeArguments().stream().map(StaticWitnessSystem::parse).toList();
+
+        yield Lists.zip(
+                decl.typeParams(),
+                args,
+                (param, arg) -> {
+                  if (param.isOut()) {
+                    return new ParsedType.Out<>(arg);
+                  } else {
+                    return arg;
+                  }
+                })
+            .stream()
+            .reduce(decl, App::new);
+      }
       case WildcardType _ -> new Wildcard<>();
       default -> throw new IllegalArgumentException("Unsupported type: " + type);
     };
@@ -94,12 +110,13 @@ public final class StaticWitnessSystem {
     return new Const<>(new Static.Const(typeElement), typeParams(typeElement));
   }
 
-  private static List<Var<Static.Var, Static.Const, Static.Prim>> typeParams(Parameterizable tp) {
-    return Lists.map(
-        tp.getTypeParameters(),
-        tpe ->
-            new Var<>(
-                new Static.Var((TypeVariable) tpe.asType()), tpe.getAnnotation(Out.class) != null));
+  private static List<TyParam<Static.Var>> typeParams(Parameterizable tp) {
+    return Lists.map(tp.getTypeParameters(), StaticWitnessSystem::typeParam);
+  }
+
+  private static TyParam<Static.Var> typeParam(TypeParameterElement element) {
+    return new TyParam<>(
+        new Static.Var((TypeVariable) element.asType()), element.getAnnotation(Out.class) != null);
   }
 
   private static Maybe<TypeMirror> parseLazyType(DeclaredType t) {

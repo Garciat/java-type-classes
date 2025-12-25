@@ -113,7 +113,7 @@ public final class Example3 {
     record Node<A>(Tree<A> left, Tree<A> right) implements Tree<A> {}
 
     @TypeClass.Witness
-    static <A, @Out Rep> ToJson<Tree<A>> toJson(
+    static <A, Rep> ToJson<Tree<A>> toJson(
         Generic<Tree<A>, Rep> generic, ToJsonGeneric<Rep> toJsonGeneric) {
       return tree -> toJsonGeneric.toJson(generic.from(tree));
     }

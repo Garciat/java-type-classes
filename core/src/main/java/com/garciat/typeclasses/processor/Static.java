@@ -8,7 +8,12 @@ import javax.lang.model.type.TypeVariable;
 public final class Static {
   private Static() {}
 
-  public record Method(ExecutableElement java) {}
+  public record Method(ExecutableElement java) {
+    @Override
+    public String toString() {
+      return java.getEnclosingElement().getSimpleName() + "." + java.getSimpleName();
+    }
+  }
 
   public record Var(TypeVariable java) {
     @Override
