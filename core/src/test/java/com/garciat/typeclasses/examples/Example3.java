@@ -1,21 +1,19 @@
 package com.garciat.typeclasses.examples;
 
+import static com.garciat.typeclasses.TypeClasses.witness;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.garciat.typeclasses.api.Lazy;
 import com.garciat.typeclasses.api.Out;
 import com.garciat.typeclasses.api.Ty;
 import com.garciat.typeclasses.api.TypeClass;
-import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.examples.Example3.TyRep.K1;
 import com.garciat.typeclasses.examples.Example3.TyRep.Prod;
 import com.garciat.typeclasses.examples.Example3.TyRep.Sum;
 import com.garciat.typeclasses.examples.Example3.TyRep.Sum.L1;
 import com.garciat.typeclasses.examples.Example3.TyRep.Sum.R1;
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
-import static com.garciat.typeclasses.TypeClasses.witness;
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 public final class Example3 {
   @Test

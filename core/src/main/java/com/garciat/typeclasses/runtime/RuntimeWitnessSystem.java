@@ -5,7 +5,6 @@ import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.api.hkt.TApp;
 import com.garciat.typeclasses.api.hkt.TPar;
 import com.garciat.typeclasses.api.hkt.TagBase;
-import com.garciat.typeclasses.impl.Match;
 import com.garciat.typeclasses.impl.ParsedType;
 import com.garciat.typeclasses.impl.ParsedType.App;
 import com.garciat.typeclasses.impl.ParsedType.ArrayOf;
@@ -18,8 +17,6 @@ import com.garciat.typeclasses.impl.WitnessConstructor;
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
-import com.garciat.typeclasses.impl.utils.Rose;
-
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.GenericDeclaration;
 import java.lang.reflect.Method;
@@ -30,7 +27,6 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.BiFunction;
 
 public final class RuntimeWitnessSystem {
   private RuntimeWitnessSystem() {}

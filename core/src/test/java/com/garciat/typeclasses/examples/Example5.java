@@ -1,13 +1,13 @@
 package com.garciat.typeclasses.examples;
 
+import static com.garciat.typeclasses.TypeClasses.witness;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.garciat.typeclasses.api.Ty;
 import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.examples.Example5.Nat.S;
 import com.garciat.typeclasses.examples.Example5.Nat.Z;
 import org.junit.jupiter.api.Test;
-
-import static com.garciat.typeclasses.TypeClasses.witness;
-import static org.assertj.core.api.Assertions.assertThat;
 
 /// Based on:
 ///

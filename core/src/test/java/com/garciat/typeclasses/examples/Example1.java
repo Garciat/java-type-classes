@@ -5,10 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.garciat.typeclasses.api.Ty;
 import com.garciat.typeclasses.api.TypeClass;
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.Test;
 
 public class Example1 {
   @Test

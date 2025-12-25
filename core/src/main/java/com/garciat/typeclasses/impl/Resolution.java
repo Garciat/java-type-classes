@@ -1,23 +1,19 @@
 package com.garciat.typeclasses.impl;
 
+import static com.garciat.typeclasses.impl.utils.Sets.difference;
+import static java.util.stream.Collectors.toSet;
+
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
-import com.garciat.typeclasses.impl.utils.Unit;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
-import static com.garciat.typeclasses.impl.utils.Sets.difference;
-import static com.garciat.typeclasses.impl.utils.Unit.unit;
-import static java.util.stream.Collectors.toSet;
 
 public final class Resolution {
   private Resolution() {}
