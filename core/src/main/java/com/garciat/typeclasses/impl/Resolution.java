@@ -95,18 +95,14 @@ public final class Resolution {
           }
         }
 
-        List<ParsedType<V, C, P>> resolvedDependencies =
-            Unification.substituteAll(substitution, match.dependencies());
+        var resolvedMatch =
+            new Match<>(
+                match.ctor(),
+                Unification.substituteAll(substitution, match.dependencies()),
+                Unification.substitute(substitution, match.witnessType()));
 
-        yield Either.traverse(resolvedDependencies, t -> resolveRec(seen, constructors, t))
-            .<Result<M, V, C, P>>map(
-                children ->
-                    new Result.Node<>(
-                        new Match<>(
-                            match.ctor(),
-                            resolvedDependencies,
-                            Unification.substitute(substitution, match.witnessType())),
-                        children))
+        yield Either.traverse(resolvedMatch.dependencies(), t -> resolveRec(seen, constructors, t))
+            .<Result<M, V, C, P>>map(children -> new Result.Node<>(resolvedMatch, children))
             .mapLeft(f -> new Failure.Nested<>(target, f));
       }
     };
