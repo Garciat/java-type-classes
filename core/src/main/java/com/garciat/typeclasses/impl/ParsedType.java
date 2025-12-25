@@ -3,7 +3,7 @@ package com.garciat.typeclasses.impl;
 import java.util.List;
 
 public sealed interface ParsedType<V, C, P> {
-  record Var<V, C, P>(V repr) implements ParsedType<V, C, P> {}
+  record Var<V, C, P>(V repr, boolean isOut) implements ParsedType<V, C, P> {}
 
   record App<V, C, P>(ParsedType<V, C, P> fun, ParsedType<V, C, P> arg)
       implements ParsedType<V, C, P> {}
@@ -16,9 +16,11 @@ public sealed interface ParsedType<V, C, P> {
 
   record Wildcard<V, C, P>() implements ParsedType<V, C, P> {}
 
+  record Lazy<V, C, P>(ParsedType<V, C, P> under) implements ParsedType<V, C, P> {}
+
   default String format() {
     return switch (this) {
-      case Var(var repr) -> repr.toString();
+      case Var(var repr, var isOut) -> (isOut ? "&" : "") + repr.toString();
       case Const(var repr, var typeParams) ->
           repr.toString()
               + typeParams.stream()
@@ -30,6 +32,7 @@ public sealed interface ParsedType<V, C, P> {
       case ArrayOf(var elem) -> elem.format() + "[]";
       case Primitive(var repr) -> repr.toString();
       case Wildcard() -> "?";
+      case Lazy(var repr) -> "Lazy<" + repr.format() + ">";
     };
   }
 }

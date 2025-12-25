@@ -2,6 +2,8 @@ package com.garciat.typeclasses.processor;
 
 import static com.garciat.typeclasses.impl.utils.Streams.isInstanceOf;
 
+import com.garciat.typeclasses.api.Lazy;
+import com.garciat.typeclasses.api.Out;
 import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.api.hkt.TApp;
 import com.garciat.typeclasses.api.hkt.TPar;
@@ -17,6 +19,7 @@ import com.garciat.typeclasses.impl.ParsedType.Wildcard;
 import com.garciat.typeclasses.impl.Resolution;
 import com.garciat.typeclasses.impl.WitnessConstructor;
 import com.garciat.typeclasses.impl.utils.Either;
+import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
 import com.garciat.typeclasses.impl.utils.Rose;
@@ -38,14 +41,14 @@ public final class StaticWitnessSystem {
 
   public static Either<
           Resolution.Failure<Static.Method, Static.Var, Static.Const, Static.Prim>,
-          Rose<Match<Static.Method, Static.Var, Static.Const, Static.Prim>>>
+          Resolution.Result<Static.Method, Static.Var, Static.Const, Static.Prim>>
       resolve(TypeMirror target) {
-    return Resolution.resolve(StaticWitnessSystem::findWitnesses, Rose::of, parse(target));
+    return Resolution.resolve(StaticWitnessSystem::findWitnesses, parse(target));
   }
 
   private static List<WitnessConstructor<Static.Method, Static.Var, Static.Const, Static.Prim>>
-      findWitnesses(ParsedType.Const<Static.Var, Static.Const, Static.Prim> target) {
-    return target.repr().java().getEnclosedElements().stream()
+      findWitnesses(Static.Const target) {
+    return target.java().getEnclosedElements().stream()
         .flatMap(isInstanceOf(ExecutableElement.class))
         .flatMap(method -> parseWitnessConstructor(method).stream())
         .toList();
@@ -61,10 +64,7 @@ public final class StaticWitnessSystem {
               new Static.Method(method),
               witnessAnn.overlap(),
               typeParams(method),
-              method.getParameters().stream()
-                  .map(VariableElement::asType)
-                  .map(StaticWitnessSystem::parse)
-                  .toList(),
+              Lists.map(method.getParameters(), p -> parse(p.asType())),
               parse(method.getReturnType())));
 
     } else {
@@ -74,13 +74,16 @@ public final class StaticWitnessSystem {
 
   private static ParsedType<Static.Var, Static.Const, Static.Prim> parse(TypeMirror type) {
     return switch (type) {
-      case TypeVariable tv -> new Var<>(new Static.Var(tv));
+      case TypeVariable tv ->
+          new Var<>(new Static.Var(tv), tv.asElement().getAnnotation(Out.class) != null);
       case ArrayType at -> new ArrayOf<>(parse(at.getComponentType()));
       case PrimitiveType pt -> new Primitive<>(new Static.Prim(pt));
       case DeclaredType dt when parseTagType(dt) instanceof Maybe.Just(var realType) ->
           constType(realType);
       case DeclaredType dt when parseAppType(dt) instanceof Maybe.Just(Pair(var fun, var arg)) ->
           new App<>(parse(fun), parse(arg));
+      case DeclaredType dt when parseLazyType(dt) instanceof Maybe.Just(var under) ->
+          new ParsedType.Lazy<>(parse(under));
       case DeclaredType dt ->
           dt.getTypeArguments().stream()
               .map(StaticWitnessSystem::parse)
@@ -95,12 +98,21 @@ public final class StaticWitnessSystem {
   }
 
   private static List<Var<Static.Var, Static.Const, Static.Prim>> typeParams(Parameterizable tp) {
-    return tp.getTypeParameters().stream()
-        .map(
-            tpe ->
-                new Var<Static.Var, Static.Const, Static.Prim>(
-                    new Static.Var((TypeVariable) tpe.asType())))
-        .toList();
+    return Lists.map(
+        tp.getTypeParameters(),
+        tpe ->
+            new Var<>(
+                new Static.Var((TypeVariable) tpe.asType()), tpe.getAnnotation(Out.class) != null));
+  }
+
+  private static Maybe<TypeMirror> parseLazyType(DeclaredType t) {
+    if (t.asElement() instanceof TypeElement te
+        && te.getQualifiedName().contentEquals(Lazy.class.getName())
+        && t.getTypeArguments().size() == 1) {
+      return Maybe.just(t.getTypeArguments().getFirst());
+    } else {
+      return Maybe.nothing();
+    }
   }
 
   private static Maybe<TypeElement> parseTagType(DeclaredType t) {

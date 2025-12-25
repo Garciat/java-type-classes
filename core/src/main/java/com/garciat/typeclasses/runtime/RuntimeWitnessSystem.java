@@ -1,5 +1,6 @@
 package com.garciat.typeclasses.runtime;
 
+import com.garciat.typeclasses.api.Out;
 import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.api.hkt.TApp;
 import com.garciat.typeclasses.api.hkt.TPar;
@@ -17,6 +18,8 @@ import com.garciat.typeclasses.impl.WitnessConstructor;
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
+import com.garciat.typeclasses.impl.utils.Rose;
+
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.GenericDeclaration;
 import java.lang.reflect.Method;
@@ -32,19 +35,16 @@ import java.util.function.BiFunction;
 public final class RuntimeWitnessSystem {
   private RuntimeWitnessSystem() {}
 
-  public static <R>
-      Either<Resolution.Failure<Runtime.Method, Runtime.Var, Runtime.Const, Runtime.Prim>, R>
-          resolve(
-              Type type,
-              BiFunction<
-                      Match<Runtime.Method, Runtime.Var, Runtime.Const, Runtime.Prim>, List<R>, R>
-                  build) {
-    return Resolution.resolve(RuntimeWitnessSystem::findWitnesses, build, parse(type));
+  public static Either<
+          Resolution.Failure<Runtime.Method, Runtime.Var, Runtime.Const, Runtime.Prim>,
+          Resolution.Result<Runtime.Method, Runtime.Var, Runtime.Const, Runtime.Prim>>
+      resolve(Type type) {
+    return Resolution.resolve(RuntimeWitnessSystem::findWitnesses, parse(type));
   }
 
   private static List<WitnessConstructor<Runtime.Method, Runtime.Var, Runtime.Const, Runtime.Prim>>
-      findWitnesses(ParsedType.Const<Runtime.Var, Runtime.Const, Runtime.Prim> target) {
-    return Arrays.stream(target.repr().java().getDeclaredMethods())
+      findWitnesses(Runtime.Const target) {
+    return Arrays.stream(target.java().getDeclaredMethods())
         .flatMap(m -> parseWitnessConstructor(m).stream())
         .toList();
   }
@@ -75,9 +75,11 @@ public final class RuntimeWitnessSystem {
       case Class<?> arr when arr.isArray() -> new ArrayOf<>(parse(arr.getComponentType()));
       case Class<?> prim when prim.isPrimitive() -> new Primitive<>(new Runtime.Prim(prim));
       case Class<?> c -> constType(c);
-      case TypeVariable<?> v -> new Var<>(new Runtime.Var(v));
+      case TypeVariable<?> v -> new Var<>(new Runtime.Var(v), v.isAnnotationPresent(Out.class));
       case ParameterizedType p when parseAppType(p) instanceof Maybe.Just(Pair(var fun, var arg)) ->
           new App<>(parse(fun), parse(arg));
+      case ParameterizedType p when parseLazyType(p) instanceof Maybe.Just(var under) ->
+          new ParsedType.Lazy<>(parse(under));
       case ParameterizedType p ->
           Arrays.stream(p.getActualTypeArguments())
               .map(RuntimeWitnessSystem::parse)
@@ -95,13 +97,24 @@ public final class RuntimeWitnessSystem {
   private static List<Var<Runtime.Var, Runtime.Const, Runtime.Prim>> typeParams(
       GenericDeclaration cls) {
     return Arrays.stream(cls.getTypeParameters())
-        .map(t -> new Var<Runtime.Var, Runtime.Const, Runtime.Prim>(new Runtime.Var(t)))
+        .<Var<Runtime.Var, Runtime.Const, Runtime.Prim>>map(
+            t -> new Var<>(new Runtime.Var(t), t.isAnnotationPresent(Out.class)))
         .toList();
+  }
+
+  private static Maybe<Type> parseLazyType(ParameterizedType t) {
+    return switch (t.getRawType()) {
+      case Class<?> raw when raw.equals(com.garciat.typeclasses.api.Lazy.class) ->
+          Maybe.just(t.getActualTypeArguments()[0]);
+      default -> Maybe.nothing();
+    };
   }
 
   private static Maybe<Class<?>> parseTagType(Class<?> c) {
     return switch (c.getEnclosingClass()) {
-      case Class<?> enclosing when c.getSuperclass().equals(TagBase.class) -> Maybe.just(enclosing);
+      case Class<?> enclosing
+          when c.getSuperclass() instanceof Class<?> sup && sup.equals(TagBase.class) ->
+          Maybe.just(enclosing);
       case null, default -> Maybe.nothing();
     };
   }

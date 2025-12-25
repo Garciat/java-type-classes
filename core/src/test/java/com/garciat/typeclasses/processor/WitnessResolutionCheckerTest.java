@@ -20,7 +20,14 @@ public class WitnessResolutionCheckerTest {
   @Nullable @TempDir Path tempDir;
 
   @ParameterizedTest
-  @ValueSource(strings = {"Example1.java", "Example2.java"})
+  @ValueSource(
+      strings = {
+        "Example1.java",
+        "Example2.java",
+        "Example3.java",
+        "Example4.java",
+        "Example5.java",
+      })
   public void checkExample(String fileName) throws IOException {
     requireNonNull(tempDir);
 
@@ -34,7 +41,7 @@ public class WitnessResolutionCheckerTest {
     fileManager.setLocation(StandardLocation.SOURCE_OUTPUT, List.of(tempDir.toFile()));
 
     var files = new java.util.ArrayList<File>();
-    files.add(new File("src/test/java/com/garciat/typeclasses/processor/examples/" + fileName));
+    files.add(new File("src/test/java/com/garciat/typeclasses/examples/" + fileName));
 
     var compilationUnits = fileManager.getJavaFileObjectsFromFiles(files);
 
