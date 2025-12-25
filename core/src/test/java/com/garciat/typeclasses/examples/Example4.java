@@ -43,35 +43,13 @@ public class Example4 {
     List<T> flatten(A list);
 
     @TypeClass.Witness
-    static <A, T> Flatten<List<A>, T> here(TyEq<A, T> eq) {
-      return list -> list.stream().map(eq::castLeft).toList();
+    static <A> Flatten<List<A>, A> here() {
+      return list -> list;
     }
 
     @TypeClass.Witness(overlap = TypeClass.Witness.Overlap.OVERLAPPING)
     static <A, @Out R> Flatten<List<List<A>>, R> there(Flatten<List<A>, R> e) {
       return list -> list.stream().flatMap(innerList -> e.flatten(innerList).stream()).toList();
-    }
-  }
-
-  @TypeClass
-  public interface TyEq<A, B> {
-    B castLeft(A a);
-
-    A castRight(B b);
-
-    @TypeClass.Witness
-    static <A> TyEq<A, A> refl() {
-      return new TyEq<>() {
-        @Override
-        public A castLeft(A a) {
-          return a;
-        }
-
-        @Override
-        public A castRight(A a) {
-          return a;
-        }
-      };
     }
   }
 }
