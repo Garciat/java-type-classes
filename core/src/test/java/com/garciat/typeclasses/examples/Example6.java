@@ -7,7 +7,6 @@ import com.garciat.typeclasses.api.Out;
 import com.garciat.typeclasses.api.Ty;
 import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.impl.utils.Unit;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class Example6 {

@@ -1,5 +1,9 @@
 package com.garciat.typeclasses.impl;
 
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toUnmodifiableList;
+import static java.util.stream.Collectors.toUnmodifiableSet;
+
 import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Lists;
@@ -7,7 +11,6 @@ import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
 import com.garciat.typeclasses.impl.utils.Sets;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -17,10 +20,6 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toUnmodifiableList;
-import static java.util.stream.Collectors.toUnmodifiableSet;
 
 public final class Resolution {
   private Resolution() {}
