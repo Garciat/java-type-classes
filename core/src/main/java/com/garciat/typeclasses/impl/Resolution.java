@@ -142,8 +142,10 @@ public final class Resolution {
                   }
                 }
               }
-              case Either.Right(_) -> {
-                // This is either of the lazy cases
+              case Either.Right(Result.LazyWrap(_)) ->
+                  throw new IllegalStateException(
+                      "flatten should have eliminated LazyWrap cases here");
+              case Either.Right(Result.LazyLookup(_)) -> {
                 // For now, we just treat them as resolved constraints
                 // :shrug:
               }
