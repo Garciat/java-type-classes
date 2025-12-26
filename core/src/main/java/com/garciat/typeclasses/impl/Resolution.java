@@ -23,6 +23,15 @@ import java.util.stream.Collectors;
 public final class Resolution {
   private Resolution() {}
 
+  public sealed interface Result<M, V, C, P> {
+    record Node<M, V, C, P>(Match<M, V, C, P> match, List<Result<M, V, C, P>> children)
+        implements Result<M, V, C, P> {}
+
+    record LazyLookup<M, V, C, P>(ParsedType<V, C, P> target) implements Result<M, V, C, P> {}
+
+    record LazyWrap<M, V, C, P>(Result<M, V, C, P> under) implements Result<M, V, C, P> {}
+  }
+
   public static <M, V, C, P> Either<Failure<M, V, C, P>, Result<M, V, C, P>> resolve(
       Function<C, List<WitnessConstructor<M, V, C, P>>> constructors, ParsedType<V, C, P> target) {
     return resolveRec(new HashSet<>(), constructors, target);
@@ -171,19 +180,10 @@ public final class Resolution {
     };
   }
 
-  public sealed interface Result<M, V, C, P> {
-    record Node<M, V, C, P>(Match<M, V, C, P> match, List<Result<M, V, C, P>> children)
-        implements Result<M, V, C, P> {}
-
-    record LazyLookup<M, V, C, P>(ParsedType<V, C, P> target) implements Result<M, V, C, P> {}
-
-    record LazyWrap<M, V, C, P>(Result<M, V, C, P> under) implements Result<M, V, C, P> {}
-  }
-
   private record Node<V, C, P>(
       ParsedType<V, C, P> type, Set<Var<V, C, P>> out, Set<Var<V, C, P>> in) {}
 
-  private sealed interface MatchFailure<M, V, C, P> {
+  public sealed interface MatchFailure<M, V, C, P> {
     record HeadMismatch<M, V, C, P>(WitnessConstructor<M, V, C, P> ctor)
         implements MatchFailure<M, V, C, P> {}
 

@@ -35,9 +35,11 @@ public final class Unification {
       case Pair(ArrayOf(var elem1), ArrayOf(var elem2)) -> unify(elem1, elem2);
       case Pair(Primitive(var prim1), Primitive(var prim2)) when prim1.equals(prim2) ->
           Maybe.just(Map.of());
+      // Wildcards can match anything
       case Pair(Wildcard(), _) -> Maybe.just(Map.of());
-      case Pair(Out(_), _) -> Maybe.just(Map.of());
-      case Pair(_, Out(_)) -> Maybe.just(Map.of());
+      // Out types match each other, regardless of their inner types
+      // The resolution algorithm will check compatibility later
+      case Pair(Out(_), Out(_)) -> Maybe.just(Map.of());
       case Pair(_, _) -> Maybe.nothing();
     };
   }
