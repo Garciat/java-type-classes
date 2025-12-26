@@ -84,18 +84,7 @@ public final class RuntimeWitnessSystem {
         List<ParsedType<Runtime.Var, Runtime.Const, Runtime.Prim>> args =
             Arrays.stream(p.getActualTypeArguments()).map(RuntimeWitnessSystem::parse).toList();
 
-        yield Lists.zip(
-                decl.typeParams(),
-                args,
-                (param, arg) -> {
-                  if (param.isOut()) {
-                    return new ParsedType.Out<>(arg);
-                  } else {
-                    return arg;
-                  }
-                })
-            .stream()
-            .reduce(decl, App::new);
+        yield Lists.zip(decl.typeParams(), args, TyParam::wrapOut).stream().reduce(decl, App::new);
       }
       case GenericArrayType a -> new ArrayOf<>(parse(a.getGenericComponentType()));
       case WildcardType _ -> new Wildcard<>();

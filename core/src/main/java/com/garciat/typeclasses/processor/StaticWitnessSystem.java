@@ -88,18 +88,7 @@ public final class StaticWitnessSystem {
         List<ParsedType<Static.Var, Static.Const, Static.Prim>> args =
             dt.getTypeArguments().stream().map(StaticWitnessSystem::parse).toList();
 
-        yield Lists.zip(
-                decl.typeParams(),
-                args,
-                (param, arg) -> {
-                  if (param.isOut()) {
-                    return new ParsedType.Out<>(arg);
-                  } else {
-                    return arg;
-                  }
-                })
-            .stream()
-            .reduce(decl, App::new);
+        yield Lists.zip(decl.typeParams(), args, TyParam::wrapOut).stream().reduce(decl, App::new);
       }
       case WildcardType _ -> new Wildcard<>();
       default -> throw new IllegalArgumentException("Unsupported type: " + type);

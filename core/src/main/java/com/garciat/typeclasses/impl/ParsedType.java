@@ -21,6 +21,10 @@ public sealed interface ParsedType<V, C, P> {
   record Lazy<V, C, P>(ParsedType<V, C, P> under) implements ParsedType<V, C, P> {}
 
   record TyParam<V>(V repr, boolean isOut) {
+    public <C, P> ParsedType<V, C, P> wrapOut(ParsedType<V, C, P> under) {
+      return isOut ? new Out<>(under) : under;
+    }
+
     @Override
     public String toString() {
       return (isOut ? "&" : "") + repr;
