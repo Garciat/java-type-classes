@@ -142,9 +142,10 @@ public final class Resolution {
                   }
                 }
               }
-              case Either.Right(var lazy) -> {
-                throw new IllegalStateException(
-                    "Unresolved lazy lookups should not occur during matching: " + lazy);
+              case Either.Right(_) -> {
+                // This is either of the lazy cases
+                // For now, we just treat them as resolved constraints
+                // :shrug:
               }
               case Either.Left(var error) -> {
                 // Could not resolve child witness
