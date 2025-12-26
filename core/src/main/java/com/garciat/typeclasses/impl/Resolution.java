@@ -34,13 +34,13 @@ public final class Resolution {
       Function<C, List<WitnessConstructor<M, V, C, P>>> constructors,
       ParsedType<V, C, P> target) {
     if (target instanceof ParsedType.Lazy(var under)) {
-      if (seen.contains(target)) {
+      if (seen.contains(under)) {
         return Either.right(new Result.LazyLookup<>(under));
       } else {
-        seen.add(target);
+        seen.add(under);
         var out =
             resolveRec(seen, constructors, under).<Result<M, V, C, P>>map(Result.LazyWrap::new);
-        seen.remove(target);
+        seen.remove(under);
         return out;
       }
     }
