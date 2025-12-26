@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class Example6 {
-  @Disabled("Not working yet ):")
   @Test
   void test1() {
     var expr = new Expr.Add<>(new Expr.Int(1), new Expr.Add<>(new Expr.Int(2), new Expr.Int(3)));

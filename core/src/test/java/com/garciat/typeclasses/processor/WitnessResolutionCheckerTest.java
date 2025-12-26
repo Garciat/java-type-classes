@@ -27,6 +27,7 @@ public class WitnessResolutionCheckerTest {
         "Example3.java",
         "Example4.java",
         "Example5.java",
+        "Example6.java",
       })
   public void checkExample(String fileName) throws IOException {
     requireNonNull(tempDir);
