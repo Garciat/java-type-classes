@@ -51,4 +51,20 @@ public sealed interface Either<L, R> {
     }
     return right(result);
   }
+
+  static <L, R> Pair<List<L>, List<R>> partition(List<Either<L, R>> eithers) {
+    List<L> lefts = new ArrayList<>();
+    List<R> rights = new ArrayList<>();
+    for (Either<L, R> either : eithers) {
+      switch (either) {
+        case Left(L value) -> {
+          lefts.add(value);
+        }
+        case Right(R value) -> {
+          rights.add(value);
+        }
+      }
+    }
+    return new Pair<>(lefts, rights);
+  }
 }
