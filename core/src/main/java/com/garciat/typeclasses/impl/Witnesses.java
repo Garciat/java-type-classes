@@ -1,7 +1,6 @@
 package com.garciat.typeclasses.impl;
 
 import com.garciat.typeclasses.impl.utils.Lists;
-
 import java.util.List;
 import java.util.function.Function;
 
