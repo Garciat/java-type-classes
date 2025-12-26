@@ -2,7 +2,6 @@ package com.garciat.typeclasses.impl.utils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.function.Function;
 
 public sealed interface Either<L, R> {
@@ -16,14 +15,6 @@ public sealed interface Either<L, R> {
 
   static <L, R> Either<L, R> right(R value) {
     return new Right<>(value);
-  }
-
-  static <A> Either<Exception, A> call(Callable<A> callable) {
-    try {
-      return right(callable.call());
-    } catch (Exception e) {
-      return left(e);
-    }
   }
 
   default <X> Either<L, X> map(Function<? super R, ? extends X> f) {
@@ -59,5 +50,21 @@ public sealed interface Either<L, R> {
       }
     }
     return right(result);
+  }
+
+  static <L, R> Pair<List<L>, List<R>> partition(List<Either<L, R>> eithers) {
+    List<L> lefts = new ArrayList<>();
+    List<R> rights = new ArrayList<>();
+    for (Either<L, R> either : eithers) {
+      switch (either) {
+        case Left(L value) -> {
+          lefts.add(value);
+        }
+        case Right(R value) -> {
+          rights.add(value);
+        }
+      }
+    }
+    return new Pair<>(lefts, rights);
   }
 }

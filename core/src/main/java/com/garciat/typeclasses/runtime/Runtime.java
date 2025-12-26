@@ -3,7 +3,12 @@ package com.garciat.typeclasses.runtime;
 public final class Runtime {
   private Runtime() {}
 
-  public record Method(java.lang.reflect.Method java) {}
+  public record Method(java.lang.reflect.Method java) {
+    @Override
+    public String toString() {
+      return java.getDeclaringClass().getSimpleName() + "." + java.getName();
+    }
+  }
 
   public record Var(java.lang.reflect.TypeVariable<?> java) {
     @Override
