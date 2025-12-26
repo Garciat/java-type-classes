@@ -73,9 +73,6 @@ public final class StaticWitnessSystem {
 
   private static ParsedType<Static.Var, Static.Const, Static.Prim> parse(TypeMirror type) {
     return switch (type) {
-      case TypeVariable tv -> new Var<>(typeParam((TypeParameterElement) tv.asElement()));
-      case ArrayType at -> new ArrayOf<>(parse(at.getComponentType()));
-      case PrimitiveType pt -> new Primitive<>(new Static.Prim(pt));
       case DeclaredType dt when parseTagType(dt) instanceof Maybe.Just(var realType) ->
           constType(realType);
       case DeclaredType dt when parseAppType(dt) instanceof Maybe.Just(Pair(var fun, var arg)) ->
@@ -86,10 +83,13 @@ public final class StaticWitnessSystem {
         Const<Static.Var, Static.Const, Static.Prim> decl = constType(erasure(dt));
 
         List<ParsedType<Static.Var, Static.Const, Static.Prim>> args =
-            dt.getTypeArguments().stream().map(StaticWitnessSystem::parse).toList();
+            Lists.map(dt.getTypeArguments(), StaticWitnessSystem::parse);
 
         yield Lists.zip(decl.typeParams(), args, TyParam::wrapOut).stream().reduce(decl, App::new);
       }
+      case TypeVariable tv -> new Var<>(typeParam((TypeParameterElement) tv.asElement()));
+      case ArrayType at -> new ArrayOf<>(parse(at.getComponentType()));
+      case PrimitiveType pt -> new Primitive<>(new Static.Prim(pt));
       case WildcardType _ -> new Wildcard<>();
       default -> throw new IllegalArgumentException("Unsupported type: " + type);
     };
@@ -109,8 +109,7 @@ public final class StaticWitnessSystem {
   }
 
   private static Maybe<TypeMirror> parseLazyType(DeclaredType t) {
-    if (t.asElement() instanceof TypeElement te
-        && te.getQualifiedName().contentEquals(Lazy.class.getName())
+    if (erasure(t).getQualifiedName().contentEquals(Lazy.class.getName())
         && t.getTypeArguments().size() == 1) {
       return Maybe.just(t.getTypeArguments().getFirst());
     } else {
@@ -131,7 +130,7 @@ public final class StaticWitnessSystem {
   }
 
   private static Maybe<Pair<TypeMirror, TypeMirror>> parseAppType(DeclaredType t) {
-    return t.getTypeArguments().size() == 2 && isAppType(erasure(t))
+    return isAppType(erasure(t)) && t.getTypeArguments().size() == 2
         ? Maybe.just(Pair.of(t.getTypeArguments().get(0), t.getTypeArguments().get(1)))
         : Maybe.nothing();
   }

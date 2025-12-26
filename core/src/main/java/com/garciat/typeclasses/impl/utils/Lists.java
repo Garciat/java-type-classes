@@ -10,6 +10,10 @@ import java.util.stream.IntStream;
 public final class Lists {
   private Lists() {}
 
+  public static <A, B> List<B> map(A[] list, Function<? super A, ? extends B> f) {
+    return map(Arrays.asList(list), f);
+  }
+
   public static <A, B> List<B> map(List<A> list, Function<? super A, ? extends B> f) {
     return list.stream().map(f).collect(Collectors.toList());
   }

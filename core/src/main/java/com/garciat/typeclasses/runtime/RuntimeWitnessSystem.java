@@ -57,9 +57,7 @@ public final class RuntimeWitnessSystem {
               new Runtime.Method(method),
               witnessAnn.overlap(),
               typeParams(method),
-              Arrays.stream(method.getGenericParameterTypes())
-                  .map(RuntimeWitnessSystem::parse)
-                  .toList(),
+              Lists.map(method.getGenericParameterTypes(), RuntimeWitnessSystem::parse),
               parse(method.getGenericReturnType())));
     } else {
       return Maybe.nothing();
@@ -73,7 +71,6 @@ public final class RuntimeWitnessSystem {
       case Class<?> arr when arr.isArray() -> new ArrayOf<>(parse(arr.getComponentType()));
       case Class<?> prim when prim.isPrimitive() -> new Primitive<>(new Runtime.Prim(prim));
       case Class<?> c -> constType(c);
-      case TypeVariable<?> v -> new Var<>(typeParam(v));
       case ParameterizedType p when parseAppType(p) instanceof Maybe.Just(Pair(var fun, var arg)) ->
           new App<>(parse(fun), parse(arg));
       case ParameterizedType p when parseLazyType(p) instanceof Maybe.Just(var under) ->
@@ -82,10 +79,11 @@ public final class RuntimeWitnessSystem {
         Const<Runtime.Var, Runtime.Const, Runtime.Prim> decl = constType((Class<?>) p.getRawType());
 
         List<ParsedType<Runtime.Var, Runtime.Const, Runtime.Prim>> args =
-            Arrays.stream(p.getActualTypeArguments()).map(RuntimeWitnessSystem::parse).toList();
+            Lists.map(p.getActualTypeArguments(), RuntimeWitnessSystem::parse);
 
         yield Lists.zip(decl.typeParams(), args, TyParam::wrapOut).stream().reduce(decl, App::new);
       }
+      case TypeVariable<?> v -> new Var<>(typeParam(v));
       case GenericArrayType a -> new ArrayOf<>(parse(a.getGenericComponentType()));
       case WildcardType _ -> new Wildcard<>();
       default -> throw new IllegalArgumentException("Unsupported type: " + java);
@@ -97,7 +95,7 @@ public final class RuntimeWitnessSystem {
   }
 
   private static List<TyParam<Runtime.Var>> typeParams(GenericDeclaration cls) {
-    return Arrays.stream(cls.getTypeParameters()).map(RuntimeWitnessSystem::typeParam).toList();
+    return Lists.map(cls.getTypeParameters(), RuntimeWitnessSystem::typeParam);
   }
 
   private static TyParam<Runtime.Var> typeParam(TypeVariable<?> t) {
@@ -105,27 +103,35 @@ public final class RuntimeWitnessSystem {
   }
 
   private static Maybe<Type> parseLazyType(ParameterizedType t) {
-    return switch (t.getRawType()) {
-      case Class<?> raw when raw.equals(com.garciat.typeclasses.api.Lazy.class) ->
-          Maybe.just(t.getActualTypeArguments()[0]);
-      default -> Maybe.nothing();
-    };
+    if (erasure(t).equals(com.garciat.typeclasses.api.Lazy.class)
+        && t.getActualTypeArguments().length == 1) {
+      return Maybe.just(t.getActualTypeArguments()[0]);
+    } else {
+      return Maybe.nothing();
+    }
   }
 
   private static Maybe<Class<?>> parseTagType(Class<?> c) {
-    return switch (c.getEnclosingClass()) {
-      case Class<?> enclosing
-          when c.getSuperclass() instanceof Class<?> sup && sup.equals(TagBase.class) ->
-          Maybe.just(enclosing);
-      case null, default -> Maybe.nothing();
-    };
+    if (c.getSuperclass() instanceof Class<?> sup
+        && sup.equals(TagBase.class)
+        && c.getEnclosingClass() instanceof Class<?> enclosing) {
+      return Maybe.just(enclosing);
+    } else {
+      return Maybe.nothing();
+    }
   }
 
   private static Maybe<Pair<Type, Type>> parseAppType(ParameterizedType t) {
-    return switch (t.getRawType()) {
-      case Class<?> raw when raw.equals(TApp.class) || raw.equals(TPar.class) ->
-          Maybe.just(Pair.of(t.getActualTypeArguments()[0], t.getActualTypeArguments()[1]));
-      default -> Maybe.nothing();
-    };
+    return isAppType(erasure(t)) && t.getActualTypeArguments().length == 2
+        ? Maybe.just(Pair.of(t.getActualTypeArguments()[0], t.getActualTypeArguments()[1]))
+        : Maybe.nothing();
+  }
+
+  private static boolean isAppType(Class<?> t) {
+    return t.equals(TApp.class) || t.equals(TPar.class);
+  }
+
+  private static Class<?> erasure(ParameterizedType type) {
+    return (Class<?>) type.getRawType();
   }
 }
