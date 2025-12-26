@@ -5,13 +5,14 @@ import java.util.stream.Stream;
 public final class Types {
   private Types() {}
 
-  public static <V, C, P> Stream<ParsedType.Out<V, C, P>> findOuts(ParsedType<V, C, P> type) {
+  public static <V, C, P> Stream<ParsedType.Var<V, C, P>> findOutVars(ParsedType<V, C, P> type) {
     return switch (type) {
       case ParsedType.Var(_) -> Stream.of();
-      case ParsedType.Out<V, C, P> v -> Stream.of(v);
-      case ParsedType.App(var fun, var arg) -> Stream.concat(findOuts(fun), findOuts(arg));
-      case ParsedType.ArrayOf(var elem) -> findOuts(elem);
-      case ParsedType.Lazy(var under) -> findOuts(under);
+      case ParsedType.Out(ParsedType.Var<V, C, P> v) -> Stream.of(v);
+      case ParsedType.Out(_) -> Stream.of();
+      case ParsedType.App(var fun, var arg) -> Stream.concat(findOutVars(fun), findOutVars(arg));
+      case ParsedType.ArrayOf(var elem) -> findOutVars(elem);
+      case ParsedType.Lazy(var under) -> findOutVars(under);
       case ParsedType.Const(_, _), ParsedType.Primitive(_), ParsedType.Wildcard() -> Stream.of();
     };
   }

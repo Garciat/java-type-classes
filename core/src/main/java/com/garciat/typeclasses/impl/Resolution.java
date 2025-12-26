@@ -1,5 +1,6 @@
 package com.garciat.typeclasses.impl;
 
+import static com.garciat.typeclasses.impl.utils.AutoCloseables.around;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toUnmodifiableList;
 import static java.util.stream.Collectors.toUnmodifiableSet;
@@ -8,7 +9,6 @@ import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
-import com.garciat.typeclasses.impl.utils.Pair;
 import com.garciat.typeclasses.impl.utils.Sets;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
 import java.util.HashMap;
@@ -19,19 +19,9 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public final class Resolution {
   private Resolution() {}
-
-  public sealed interface Result<M, V, C, P> {
-    record Node<M, V, C, P>(Match<M, V, C, P> match, List<Result<M, V, C, P>> children)
-        implements Result<M, V, C, P> {}
-
-    record LazyLookup<M, V, C, P>(ParsedType<V, C, P> target) implements Result<M, V, C, P> {}
-
-    record LazyWrap<M, V, C, P>(Result<M, V, C, P> under) implements Result<M, V, C, P> {}
-  }
 
   public static <M, V, C, P> Either<Failure<M, V, C, P>, Result<M, V, C, P>> resolve(
       Function<C, List<WitnessConstructor<M, V, C, P>>> constructors, ParsedType<V, C, P> target) {
@@ -46,18 +36,17 @@ public final class Resolution {
       if (seen.contains(under)) {
         return Either.right(new Result.LazyLookup<>(under));
       } else {
-        seen.add(under);
-        var out =
-            resolveRec(seen, constructors, under).<Result<M, V, C, P>>map(Result.LazyWrap::new);
-        seen.remove(under);
-        return out;
+        try (var _ = around(() -> seen.add(under), () -> seen.remove(under))) {
+          return resolveRec(seen, constructors, under).map(Result.LazyWrap::new);
+        }
       }
     }
 
-    var witnesses = findWitnesses(constructors, target).stream().distinct().toList();
-
-    Pair<List<MatchFailure<M, V, C, P>>, List<Match<M, V, C, P>>> attempts =
-        Either.partition(Lists.map(witnesses, ctor -> match(seen, constructors, ctor, target)));
+    var attempts =
+        Either.partition(
+            Lists.map(
+                Witnesses.findWitnesses(constructors, target),
+                ctor -> match(seen, constructors, ctor, target)));
 
     var candidates = OverlappingInstances.reduce(attempts.snd());
 
@@ -97,11 +86,12 @@ public final class Resolution {
 
         for (List<Node<V, C, P>> stratum : nodesByInDegree.sequencedValues()) {
           for (Node<V, C, P> node : stratum) {
-            if (!substitution.keySet().containsAll(node.in())) {
-              // Some input variable has not been satisfied yet
-              yield Either.left(
-                  new MatchFailure.UnboundVariables<>(
-                      ctor, Sets.difference(node.in(), substitution.keySet())));
+            {
+              var missing = Sets.difference(node.in(), substitution.keySet());
+              if (!missing.isEmpty()) {
+                // Some input variable has not been satisfied yet
+                yield Either.left(new MatchFailure.UnboundVariables<>(ctor, missing));
+              }
             }
 
             switch (flatten(
@@ -111,11 +101,12 @@ public final class Resolution {
                 switch (Unification.unify(
                     Types.unwrapOut1(node.type()), Types.unwrapOut1(possible.witnessType()))) {
                   case Maybe.Just(var childSubst) -> {
-                    if (!childSubst.keySet().containsAll(node.out())) {
-                      // Some output variable has not been satisfied
-                      yield Either.left(
-                          new MatchFailure.UnproductiveConstraint<>(
-                              ctor, Sets.difference(node.out(), childSubst.keySet())));
+                    {
+                      var missing = Sets.difference(node.out(), childSubst.keySet());
+                      if (!missing.isEmpty()) {
+                        // Some output variable has not been satisfied
+                        yield Either.left(new MatchFailure.UnproductiveConstraint<>(ctor, missing));
+                      }
                     }
 
                     for (Var<V, C, P> out : childSubst.keySet()) {
@@ -145,8 +136,7 @@ public final class Resolution {
                   throw new IllegalStateException(
                       "flatten should have eliminated LazyWrap cases here");
               case Either.Right(Result.LazyLookup(_)) -> {
-                // For now, we just treat them as resolved constraints
-                // :shrug:
+                // For now, we just treat them as resolved constraints :shrug:
               }
               case Either.Left(var error) -> {
                 // Could not resolve child witness
@@ -166,6 +156,13 @@ public final class Resolution {
     };
   }
 
+  private static <V, C, P> Node<V, C, P> parseNode(ParsedType<V, C, P> type) {
+    return new Node<>(
+        type,
+        Types.findOutVars(type).collect(toUnmodifiableSet()),
+        Types.findVars(type).collect(toUnmodifiableSet()));
+  }
+
   private static <M, V, C, P> Either<Failure<M, V, C, P>, Result<M, V, C, P>> flatten(
       Either<Failure<M, V, C, P>, Result<M, V, C, P>> result) {
     return switch (result) {
@@ -173,6 +170,18 @@ public final class Resolution {
       default -> result;
     };
   }
+
+  public sealed interface Result<M, V, C, P> {
+    record Node<M, V, C, P>(Match<M, V, C, P> match, List<Result<M, V, C, P>> children)
+        implements Result<M, V, C, P> {}
+
+    record LazyLookup<M, V, C, P>(ParsedType<V, C, P> target) implements Result<M, V, C, P> {}
+
+    record LazyWrap<M, V, C, P>(Result<M, V, C, P> under) implements Result<M, V, C, P> {}
+  }
+
+  private record Node<V, C, P>(
+      ParsedType<V, C, P> type, Set<Var<V, C, P>> out, Set<Var<V, C, P>> in) {}
 
   private sealed interface MatchFailure<M, V, C, P> {
     record HeadMismatch<M, V, C, P>(WitnessConstructor<M, V, C, P> ctor)
@@ -254,41 +263,6 @@ public final class Resolution {
                 + ".";
       };
     }
-  }
-
-  private static <V, C, P> Node<V, C, P> parseNode(ParsedType<V, C, P> type) {
-    return new Node<>(
-        type,
-        Types.findOuts(type)
-            .flatMap(
-                t ->
-                    switch (t) {
-                      case ParsedType.Out(Var<V, C, P> v) -> Stream.of(v);
-                      default -> Stream.of();
-                    })
-            .collect(toUnmodifiableSet()),
-        Types.findVars(type).collect(toUnmodifiableSet()));
-  }
-
-  private record Node<V, C, P>(
-      ParsedType<V, C, P> type, Set<Var<V, C, P>> out, Set<Var<V, C, P>> in) {}
-
-  private static <M, V, C, P> List<WitnessConstructor<M, V, C, P>> findWitnesses(
-      Function<C, List<WitnessConstructor<M, V, C, P>>> constructors, ParsedType<V, C, P> target) {
-    return switch (target) {
-      case ParsedType.App(var fun1, ParsedType.App(var fun2, _)) ->
-          Lists.concat(findWitnesses(constructors, fun1), findWitnesses(constructors, fun2));
-      case ParsedType.App(var fun, var arg) ->
-          Lists.concat(findWitnesses(constructors, fun), findWitnesses(constructors, arg));
-      case ParsedType.Const<V, C, P> c -> constructors.apply(c.repr());
-      case ParsedType.Lazy(var under) -> findWitnesses(constructors, under);
-      case Var(_),
-          ParsedType.Out(_),
-          ParsedType.ArrayOf(_),
-          ParsedType.Primitive(_),
-          ParsedType.Wildcard() ->
-          List.of();
-    };
   }
 
   public sealed interface Failure<M, V, C, P> {
