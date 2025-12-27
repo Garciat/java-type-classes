@@ -43,16 +43,24 @@ public final class Resolution {
       Set<ParsedType<V, C, P>> seen,
       Function<C, List<WitnessConstructor<M, V, C, P>>> constructors,
       ParsedType<V, C, P> target) {
-    if (target instanceof ParsedType.Lazy(var under)) {
-      if (seen.contains(under)) {
-        return Either.right(new Result.LazyLookup<>(under));
-      } else {
-        try (var _ = around(() -> seen.add(under), () -> seen.remove(under))) {
+    // Lazy and cycle detection
+    {
+      if (seen.contains(target)) {
+        if (target instanceof ParsedType.Lazy(var under)) {
+          return Either.right(new Result.LazyLookup<>(under));
+        } else {
+          return Either.left(new Failure.ResolutionCycle<>(target));
+        }
+      }
+
+      if (target instanceof ParsedType.Lazy(var under)) {
+        try (var _ = around(() -> seen.add(target), () -> seen.remove(target))) {
           return resolveRec(seen, constructors, under).map(Result.LazyWrap::new);
         }
       }
     }
 
+    // Free variable check
     {
       Set<Var<V, C, P>> freeVars = Types.findVars(target).collect(toUnmodifiableSet());
       if (!freeVars.isEmpty()) {
@@ -288,6 +296,8 @@ public final class Resolution {
   }
 
   public sealed interface Failure<M, V, C, P> {
+    record ResolutionCycle<M, V, C, P>(ParsedType<V, C, P> target) implements Failure<M, V, C, P> {}
+
     record FreeVariables<M, V, C, P>(ParsedType<V, C, P> target, Set<Var<V, C, P>> variables)
         implements Failure<M, V, C, P> {}
 
@@ -305,6 +315,8 @@ public final class Resolution {
 
     default String format() {
       return switch (this) {
+        case ResolutionCycle(var target) ->
+            "Resolution cycle detected while resolving witness for type: " + target.format();
         case FreeVariables(var target, var variables) ->
             "Cannot resolve witness for type: "
                 + target.format()
