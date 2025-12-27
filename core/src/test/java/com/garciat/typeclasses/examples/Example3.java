@@ -43,6 +43,8 @@ public final class Example3 {
   }
 
   public interface TyRep {
+    record U1() {}
+
     record K1<A>(A value) {}
 
     sealed interface Sum<A, B> {
@@ -80,8 +82,9 @@ public final class Example3 {
   public interface ToJsonGeneric<Rep> {
     JsonValue toJson(Rep rep);
 
-    static <A, Rep> ToJsonGeneric<Rep> toJsonGeneric(Generic<A, Rep> generic, ToJson<A> toJsonA) {
-      return rep -> toJsonA.toJson(generic.to(rep));
+    @TypeClass.Witness
+    static ToJsonGeneric<TyRep.U1> u1() {
+      return _ -> new JsonValue.JsonObject(List.of());
     }
 
     @TypeClass.Witness
