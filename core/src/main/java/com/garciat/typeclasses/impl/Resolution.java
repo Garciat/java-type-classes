@@ -90,56 +90,46 @@ public final class Resolution {
         List<ParsedType<V, C, P>> dependencies =
             Unification.substituteAll(headSubst, ctor.paramTypes());
 
-        List<Node<V, C, P>> nodes = Lists.map(dependencies, Resolution::parseNode);
+        List<ParsedType<V, C, P>> dependenciesByTopo;
 
-        switch (checkDisjoint(nodes)) {
-          case Either.Left(Pair(var c1, var c2)) -> {
-            yield Either.left(new MatchFailure.ConflictingConstraints<>(ctor, c1, c2));
+        switch (sortByTopo(dependencies)) {
+          case Either.Right(var sorted) -> dependenciesByTopo = sorted;
+          case Either.Left(TopoFailure.Conflict(var typeA, var typeB)) -> {
+            yield Either.left(new MatchFailure.ConflictingConstraints<>(ctor, typeA, typeB));
           }
-          case Either.Right(Unit()) -> {}
-        }
-
-        TreeMap<Integer, List<Node<V, C, P>>> nodesByInDegree =
-            nodes.stream()
-                .collect(groupingBy(n -> n.in().size(), TreeMap::new, toUnmodifiableList()));
-
-        if (!nodesByInDegree.isEmpty() && nodesByInDegree.firstKey() != 0) {
-          // There is a cycle in the dependency graph
-          yield Either.left(new MatchFailure.Cycle<>(ctor, dependencies));
+          case Either.Left(TopoFailure.Cycle()) -> {
+            yield Either.left(new MatchFailure.Cycle<>(ctor, dependencies));
+          }
         }
 
         Map<Var<V, C, P>, ParsedType<V, C, P>> substitution = new HashMap<>(headSubst);
 
-        for (List<Node<V, C, P>> stratum : nodesByInDegree.sequencedValues()) {
-          for (Node<V, C, P> node : stratum) {
-            switch (flatten(
-                resolveRec(
-                    seen, constructors, Unification.substitute(substitution, node.type())))) {
-              case Either.Right(Result.Node(var possible, _)) -> {
-                switch (Unification.unify(
-                    Types.unwrapOut1(node.type()), Types.unwrapOut1(possible.witnessType()))) {
-                  case Maybe.Just(var childSubst) -> substitution.putAll(childSubst);
-                  case Maybe.Nothing() -> {
-                    // Child witness does not match expected type
-                    yield Either.left(
-                        new MatchFailure.ResolvedConstraintMismatch<>(
-                            ctor,
-                            Types.unwrapOut1(node.type()),
-                            Types.unwrapOut1(possible.witnessType())));
-                  }
+        for (ParsedType<V, C, P> dependency : dependenciesByTopo) {
+          switch (flatten(
+              resolveRec(seen, constructors, Unification.substitute(substitution, dependency)))) {
+            case Either.Right(Result.Node(var resolved, _)) -> {
+              switch (Unification.unify(
+                  Types.unwrapOut1(dependency), Types.unwrapOut1(resolved.witnessType()))) {
+                case Maybe.Just(var childSubst) -> substitution.putAll(childSubst);
+                case Maybe.Nothing() -> {
+                  // Child witness does not match expected type
+                  yield Either.left(
+                      new MatchFailure.ResolvedConstraintMismatch<>(
+                          ctor,
+                          Types.unwrapOut1(dependency),
+                          Types.unwrapOut1(resolved.witnessType())));
                 }
               }
-              case Either.Right(Result.LazyWrap(_)) ->
-                  throw new IllegalStateException(
-                      "flatten should have eliminated LazyWrap cases here");
-              case Either.Right(Result.LazyLookup(_)) -> {
-                // For now, we just treat them as resolved constraints :shrug:
-              }
-              case Either.Left(var error) -> {
-                // Could not resolve child witness
-                yield Either.left(
-                    new MatchFailure.UnresolvedConstraint<>(ctor, node.type(), error));
-              }
+            }
+            case Either.Right(Result.LazyWrap(_)) ->
+                throw new IllegalStateException(
+                    "flatten should have eliminated LazyWrap cases here");
+            case Either.Right(Result.LazyLookup(_)) -> {
+              // For now, we just treat them as resolved constraints :shrug:
+            }
+            case Either.Left(var error) -> {
+              // Could not resolve child witness
+              yield Either.left(new MatchFailure.UnresolvedConstraint<>(ctor, dependency, error));
             }
           }
         }
@@ -151,6 +141,37 @@ public final class Resolution {
                 Unification.substitute(substitution, ctor.returnType())));
       }
     };
+  }
+
+  private static <V, C, P> Either<TopoFailure<V, C, P>, List<ParsedType<V, C, P>>> sortByTopo(
+      List<ParsedType<V, C, P>> dependencies) {
+    List<Node<V, C, P>> nodes = Lists.map(dependencies, Resolution::parseNode);
+
+    switch (checkDisjoint(nodes)) {
+      case Either.Left(Pair(var c1, var c2)) -> {
+        return Either.left(new TopoFailure.Conflict<>(c1, c2));
+      }
+      case Either.Right(Unit()) -> {}
+    }
+
+    TreeMap<Integer, List<Node<V, C, P>>> nodesByInDegree =
+        nodes.stream().collect(groupingBy(n -> n.in().size(), TreeMap::new, toUnmodifiableList()));
+
+    if (!nodesByInDegree.isEmpty() && nodesByInDegree.firstKey() != 0) {
+      return Either.left(new TopoFailure.Cycle<>());
+    }
+
+    List<ParsedType<V, C, P>> dependenciesByTopo =
+        nodesByInDegree.sequencedValues().stream().flatMap(List::stream).map(Node::type).toList();
+
+    return Either.right(dependenciesByTopo);
+  }
+
+  private sealed interface TopoFailure<V, C, P> {
+    record Conflict<V, C, P>(ParsedType<V, C, P> typeA, ParsedType<V, C, P> typeB)
+        implements TopoFailure<V, C, P> {}
+
+    record Cycle<V, C, P>() implements TopoFailure<V, C, P> {}
   }
 
   private static <V, C, P> Node<V, C, P> parseNode(ParsedType<V, C, P> type) {
