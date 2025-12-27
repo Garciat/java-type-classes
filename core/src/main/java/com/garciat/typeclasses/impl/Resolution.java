@@ -1,6 +1,7 @@
 package com.garciat.typeclasses.impl;
 
 import static com.garciat.typeclasses.impl.utils.AutoCloseables.around;
+import static com.garciat.typeclasses.impl.utils.Unit.unit;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toUnmodifiableList;
 import static java.util.stream.Collectors.toUnmodifiableSet;
@@ -9,7 +10,9 @@ import com.garciat.typeclasses.impl.ParsedType.Var;
 import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
+import com.garciat.typeclasses.impl.utils.Pair;
 import com.garciat.typeclasses.impl.utils.Sets;
+import com.garciat.typeclasses.impl.utils.Unit;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -81,9 +84,17 @@ public final class Resolution {
         List<ParsedType<V, C, P>> dependencies =
             Unification.substituteAll(returnSubst, ctor.paramTypes());
 
+        List<Node<V, C, P>> nodes = Lists.map(dependencies, Resolution::parseNode);
+
+        switch (checkDisjoint(nodes)) {
+          case Either.Left(Pair(var c1, var c2)) -> {
+            yield Either.left(new MatchFailure.ConflictingConstraints<>(ctor, c1, c2));
+          }
+          case Either.Right(Unit()) -> {}
+        }
+
         TreeMap<Integer, List<Node<V, C, P>>> nodesByInDegree =
-            dependencies.stream()
-                .map(Resolution::parseNode)
+            nodes.stream()
                 .collect(groupingBy(n -> n.in().size(), TreeMap::new, toUnmodifiableList()));
 
         if (!nodesByInDegree.isEmpty() && nodesByInDegree.firstKey() != 0) {
@@ -118,18 +129,7 @@ public final class Resolution {
                       }
                     }
 
-                    for (Var<V, C, P> out : childSubst.keySet()) {
-                      ParsedType<V, C, P> outT = childSubst.get(out);
-
-                      if (substitution.get(out) instanceof ParsedType<V, C, P> existingT
-                          && !existingT.equals(outT)) {
-                        // Conflicting substitutions
-                        yield Either.left(
-                            new MatchFailure.ConflictingSubstitution<>(ctor, out, existingT, outT));
-                      }
-
-                      substitution.put(out, outT);
-                    }
+                    substitution.putAll(childSubst);
                   }
                   case Maybe.Nothing() -> {
                     // Child witness does not match expected type
@@ -172,6 +172,22 @@ public final class Resolution {
         Types.findVars(type).collect(toUnmodifiableSet()));
   }
 
+  private static <V, C, P>
+      Either<Pair<ParsedType<V, C, P>, ParsedType<V, C, P>>, Unit> checkDisjoint(
+          List<Node<V, C, P>> nodes) {
+    Map<Var<V, C, P>, ParsedType<V, C, P>> seen = new HashMap<>();
+
+    for (Node<V, C, P> node : nodes) {
+      for (Var<V, C, P> out : node.out()) {
+        if (seen.put(out, node.type()) instanceof ParsedType<V, C, P> existing) {
+          return Either.left(new Pair<>(existing, node.type()));
+        }
+      }
+    }
+
+    return Either.right(unit());
+  }
+
   private static <M, V, C, P> Either<Failure<M, V, C, P>, Result<M, V, C, P>> flatten(
       Either<Failure<M, V, C, P>, Result<M, V, C, P>> result) {
     return switch (result) {
@@ -185,6 +201,12 @@ public final class Resolution {
 
   public sealed interface MatchFailure<M, V, C, P> {
     record HeadMismatch<M, V, C, P>(WitnessConstructor<M, V, C, P> ctor)
+        implements MatchFailure<M, V, C, P> {}
+
+    record ConflictingConstraints<M, V, C, P>(
+        WitnessConstructor<M, V, C, P> ctor,
+        ParsedType<V, C, P> constraintA,
+        ParsedType<V, C, P> constraintB)
         implements MatchFailure<M, V, C, P> {}
 
     record Cycle<M, V, C, P>(WitnessConstructor<M, V, C, P> ctor, List<ParsedType<V, C, P>> types)
@@ -210,17 +232,18 @@ public final class Resolution {
         WitnessConstructor<M, V, C, P> ctor, Set<Var<V, C, P>> variables)
         implements MatchFailure<M, V, C, P> {}
 
-    record ConflictingSubstitution<M, V, C, P>(
-        WitnessConstructor<M, V, C, P> ctor,
-        Var<V, C, P> variable,
-        ParsedType<V, C, P> existing,
-        ParsedType<V, C, P> conflicting)
-        implements MatchFailure<M, V, C, P> {}
-
     default String format() {
       return switch (this) {
         case HeadMismatch(var ctor) ->
             "Witness constructor " + ctor.format() + " does not match the target type.";
+        case ConflictingConstraints(var ctor, var constraintA, var constraintB) ->
+            "Witness constructor "
+                + ctor.format()
+                + " has out-var conflicting constraints: "
+                + constraintA.format()
+                + " and "
+                + constraintB.format()
+                + ".";
         case Cycle(var ctor, var types) ->
             "Witness constructor "
                 + ctor.format()
@@ -251,16 +274,6 @@ public final class Resolution {
                 + ctor.format()
                 + " has unproductive output variables: "
                 + variables.stream().map(Var::format).collect(Collectors.joining(", "));
-        case ConflictingSubstitution(var ctor, var variable, var existing, var conflicting) ->
-            "Witness constructor "
-                + ctor.format()
-                + " has conflicting substitutions for variable "
-                + variable.format()
-                + ": existing substitution "
-                + existing.format()
-                + ", conflicting substitution "
-                + conflicting.format()
-                + ".";
       };
     }
   }
