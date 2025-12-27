@@ -11,7 +11,6 @@ import com.garciat.typeclasses.impl.utils.Either;
 import com.garciat.typeclasses.impl.utils.Lists;
 import com.garciat.typeclasses.impl.utils.Maybe;
 import com.garciat.typeclasses.impl.utils.Pair;
-import com.garciat.typeclasses.impl.utils.Sets;
 import com.garciat.typeclasses.impl.utils.Unit;
 import com.garciat.typeclasses.impl.utils.ZeroOneMore;
 import java.util.HashMap;
@@ -54,6 +53,13 @@ public final class Resolution {
       }
     }
 
+    {
+      Set<Var<V, C, P>> freeVars = Types.findVars(target).collect(toUnmodifiableSet());
+      if (!freeVars.isEmpty()) {
+        return Either.left(new Failure.FreeVariables<>(target, freeVars));
+      }
+    }
+
     var attempts =
         Either.partition(
             Lists.map(
@@ -80,9 +86,9 @@ public final class Resolution {
       ParsedType<V, C, P> target) {
     return switch (Unification.unify(ctor.returnType(), target)) {
       case Maybe.Nothing() -> Either.left(new MatchFailure.HeadMismatch<>(ctor));
-      case Maybe.Just(var returnSubst) -> {
+      case Maybe.Just(var headSubst) -> {
         List<ParsedType<V, C, P>> dependencies =
-            Unification.substituteAll(returnSubst, ctor.paramTypes());
+            Unification.substituteAll(headSubst, ctor.paramTypes());
 
         List<Node<V, C, P>> nodes = Lists.map(dependencies, Resolution::parseNode);
 
@@ -102,35 +108,17 @@ public final class Resolution {
           yield Either.left(new MatchFailure.Cycle<>(ctor, dependencies));
         }
 
-        Map<Var<V, C, P>, ParsedType<V, C, P>> substitution = new HashMap<>(returnSubst);
+        Map<Var<V, C, P>, ParsedType<V, C, P>> substitution = new HashMap<>(headSubst);
 
         for (List<Node<V, C, P>> stratum : nodesByInDegree.sequencedValues()) {
           for (Node<V, C, P> node : stratum) {
-            {
-              var missing = Sets.difference(node.in(), substitution.keySet());
-              if (!missing.isEmpty()) {
-                // Some input variable has not been satisfied yet
-                yield Either.left(new MatchFailure.UnboundVariables<>(ctor, missing));
-              }
-            }
-
             switch (flatten(
                 resolveRec(
                     seen, constructors, Unification.substitute(substitution, node.type())))) {
               case Either.Right(Result.Node(var possible, _)) -> {
                 switch (Unification.unify(
                     Types.unwrapOut1(node.type()), Types.unwrapOut1(possible.witnessType()))) {
-                  case Maybe.Just(var childSubst) -> {
-                    {
-                      var missing = Sets.difference(node.out(), childSubst.keySet());
-                      if (!missing.isEmpty()) {
-                        // Some output variable has not been satisfied
-                        yield Either.left(new MatchFailure.UnproductiveConstraint<>(ctor, missing));
-                      }
-                    }
-
-                    substitution.putAll(childSubst);
-                  }
+                  case Maybe.Just(var childSubst) -> substitution.putAll(childSubst);
                   case Maybe.Nothing() -> {
                     // Child witness does not match expected type
                     yield Either.left(
@@ -279,6 +267,9 @@ public final class Resolution {
   }
 
   public sealed interface Failure<M, V, C, P> {
+    record FreeVariables<M, V, C, P>(ParsedType<V, C, P> target, Set<Var<V, C, P>> variables)
+        implements Failure<M, V, C, P> {}
+
     record NoMatch<M, V, C, P>(
         ParsedType<V, C, P> target,
         List<MatchFailure<M, V, C, P>> failures,
@@ -293,6 +284,11 @@ public final class Resolution {
 
     default String format() {
       return switch (this) {
+        case FreeVariables(var target, var variables) ->
+            "Cannot resolve witness for type: "
+                + target.format()
+                + "\nFree variables: "
+                + variables.stream().map(Var::format).collect(Collectors.joining(", "));
         case NoMatch(var target, var failures, var matches) ->
             "No witnesses found for type: "
                 + target.format()

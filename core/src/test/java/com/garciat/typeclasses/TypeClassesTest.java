@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.garciat.typeclasses.api.Ty;
+import com.garciat.typeclasses.api.TypeClass;
 import com.garciat.typeclasses.testclasses.TestEq;
+import com.garciat.typeclasses.testclasses.TestGeneric;
 import com.garciat.typeclasses.testclasses.TestShow;
+import com.garciat.typeclasses.testclasses.TestTrivial;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -199,21 +202,31 @@ final class TypeClassesTest {
     assertThat(eqMap.eq(map1, map3)).isFalse();
   }
 
+  @Test
+  <A> void witnessWithFreeVariables() {
+    assertThatThrownBy(() -> witness(new Ty<TestShow<List<A>>>() {}))
+        .isInstanceOf(TypeClasses.WitnessResolutionException.class)
+        .hasMessageContaining("Free variables");
+  }
+
+  @Test
+  void witnessConflictingOutVars() {
+    record Example() {
+      @TypeClass.Witness
+      public static <R> TestTrivial<Example> example(
+          TestGeneric<String, R> g1, TestGeneric<Integer, R> g2) {
+        return TestTrivial.trivial();
+      }
+    }
+
+    assertThatThrownBy(() -> witness(new Ty<TestTrivial<Example>>() {}))
+        .isInstanceOf(TypeClasses.WitnessResolutionException.class)
+        .hasMessageContaining("out-var conflicting constraints");
+  }
+
   // ============================================
   // Test helper classes
   // ============================================
 
-  @SuppressWarnings({"NullAway", "unused"})
-  static class NoWitnessType {
-    String value;
-  }
-
-  @SuppressWarnings({"NullAway", "unused"})
-  static class CustomType {
-    String value;
-
-    CustomType(String value) {
-      this.value = value;
-    }
-  }
+  record NoWitnessType() {}
 }
